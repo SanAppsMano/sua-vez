@@ -1,3 +1,13 @@
+// Destrava áudio/vibração num toque do usuário
+const alertSound = document.getElementById("alert-sound");
+document.body.addEventListener('touchstart', () => {
+  // tenta tocar e parar imediatamente
+  alertSound.play().then(() => alertSound.pause()).catch(() => {});
+  // desbloqueia vibração (Android)
+  if (navigator.vibrate) navigator.vibrate(1);
+}, { once: true });
+
+// … resto do código permanece igual …
 
 // public/client/js/client.js
 let clientId, ticketNumber;
