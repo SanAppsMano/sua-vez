@@ -1,30 +1,25 @@
 // public/client/js/client.js
 
-const ticketEl   = document.getElementById("ticket");
-const statusEl   = document.getElementById("status");
-const btnCancel  = document.getElementById("btn-cancel");
-const btnSilence = document.getElementById("btn-silence");
-const btnStart   = document.getElementById("btn-start");
-const overlay    = document.getElementById("overlay");
-const alertSound = document.getElementById("alert-sound");
+const ticketEl    = document.getElementById("ticket");
+const statusEl    = document.getElementById("status");
+const btnCancel   = document.getElementById("btn-cancel");
+const btnSilence  = document.getElementById("btn-silence");
+const btnStart    = document.getElementById("btn-start");
+const overlay     = document.getElementById("overlay");
+const alertSound  = document.getElementById("alert-sound");
 
 let clientId, ticketNumber;
 let polling, alertInterval;
+let lastAlertedCall = null;
 let silenced = false;
 
-// 0) Destravar áudio/vibração/notificações
+// 0) Destravar áudio/vibração/notificações no toque
 btnStart.addEventListener("click", () => {
-  // Áudio
-  alertSound.play().then(() => alertSound.pause()).catch(()=>{});
-  // Vibração
+  alertSound.play().then(() => alertSound.pause()).catch(() => {});
   if (navigator.vibrate) navigator.vibrate(1);
-  // Notificações
   if ("Notification" in window) Notification.requestPermission();
-  // Esconder overlay
   overlay.remove();
-  // Ativar botão cancelar
   btnCancel.disabled = false;
-  // Iniciar fluxo
   getTicket();
   polling = setInterval(checkStatus, 2000);
 });
@@ -35,11 +30,11 @@ async function getTicket() {
     const res  = await fetch("/.netlify/functions/entrar");
     const data = await res.json();
     clientId      = data.clientId;
-    ticketNumber = data.ticketNumber;
-    ticketEl.textContent   = ticketNumber;
-    statusEl.textContent   = "Aguardando chamada...";
+    ticketNumber  = data.ticketNumber;
+    ticketEl.textContent  = ticketNumber;
+    statusEl.textContent  = "Aguardando chamada...";
   } catch (e) {
-    console.error("Erro ao entrar:", e);
+    console.error("Erro entrar:", e);
     statusEl.textContent = "Erro ao obter número. Recarregue.";
   }
 }
@@ -51,43 +46,45 @@ async function checkStatus() {
     const res = await fetch("/.netlify/functions/status");
     const { currentCall } = await res.json();
 
-    // Atualiza status
-    if (currentCall !== ticketNumber) {
-      statusEl.textContent = `Chamando: ${currentCall}`;
-      return;
-    }
+    // Atualiza visual do monitor
+    statusEl.textContent = currentCall === ticketNumber
+      ? "É a sua vez!"
+      : `Chamando: ${currentCall}`;
 
-    // Se for sua vez e não estiver em alerta
-    if (currentCall === ticketNumber && !alertInterval) {
-      alertUser();
+    // Se for sua vez
+    if (currentCall === ticketNumber) {
+      // Se é uma chamada nova (ou repetida) diferente da última alertada
+      if (lastAlertedCall !== currentCall) {
+        silenced = false;             // reseta silenciador
+        alertUser();
+        lastAlertedCall = currentCall;
+      }
     }
   } catch (e) {
     console.error("Erro status:", e);
   }
 }
 
-// 3) Dispara e repete alerta
+// 3) Dispara e repete alerta enquanto não silenciado
 function alertUser() {
-  statusEl.textContent = "É a sua vez!";
-  btnSilence.hidden    = false;
+  btnSilence.hidden = false;
 
   const doAlert = () => {
     if (silenced) return;
     alertSound.currentTime = 0;
     alertSound.play().catch(err => console.warn("play() falhou:", err));
-    if (navigator.vibrate) {
-      const ok = navigator.vibrate([200,100,200]);
-      console.log("vibrate:", ok);
-    }
+    if (navigator.vibrate) navigator.vibrate([200,100,200]);
   };
 
-  // Primeira chamada imediata
+  // Alerta imediato e depois a cada 5 segundos
   doAlert();
-  // Repetir a cada 5 s
   alertInterval = setInterval(doAlert, 5000);
+
+  // Desabilita "Desistir" enquanto alerta ativo
+  btnCancel.disabled = true;
 }
 
-// 4) Silenciar alerta (apenas este ciclo)
+// 4) Silenciar apenas o ciclo atual
 btnSilence.addEventListener("click", () => {
   silenced = true;
   clearInterval(alertInterval);
@@ -96,6 +93,7 @@ btnSilence.addEventListener("click", () => {
   alertSound.currentTime = 0;
   if (navigator.vibrate) navigator.vibrate(0);
   btnSilence.hidden = true;
+  // Mantém polling ativo para nova chamada
 });
 
 // 5) Desistir da fila
