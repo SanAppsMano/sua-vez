@@ -3,15 +3,15 @@ import { Redis } from "@upstash/redis";
 import { v4 as uuidv4 } from "uuid";
 
 export async function handler(event, context) {
-  // Debug: imprima as vars no log
+  // DEBUG: verifique no log se as vars estão definidas
   console.log("REST_URL:", process.env.UPSTASH_REDIS_REST_URL);
-  console.log("REST_TOKEN:", !!process.env.UPSTASH_REDIS_REST_TOKEN);
+  console.log("REST_TOKEN exists:", !!process.env.UPSTASH_REDIS_REST_TOKEN);
 
-  // Cria o client HTTP; ele vai buscar as vars acima
+  // Cria client Upstash a partir das env vars
   const redis = Redis.fromEnv();
 
-  // Testa um comando simples
   try {
+    // Incrementa contador de tickets
     const ticketNumber = await redis.incr("ticketCounter");
     const clientId = uuidv4();
     await redis.set(`ticket:${clientId}`, ticketNumber);
