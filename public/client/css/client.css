@@ -1,41 +1,88 @@
-
 /* public/client/css/client.css */
-body {
+
+* {
+  box-sizing: border-box;
   margin: 0;
+  padding: 0;
+}
+
+body {
   font-family: Arial, sans-serif;
   background: #fff;
-  display: flex;
   height: 100vh;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .container {
   text-align: center;
   padding: 1rem;
 }
+
 h1 {
-  margin-bottom: .5rem;
   color: #0077cc;
+  margin-bottom: 0.5rem;
 }
+
 .ticket {
   font-size: 6rem;
   font-weight: bold;
   margin: 1rem 0;
+  color: #333;
 }
-.btn-cancel {
-  padding: .75rem 1.5rem;
+
+.status {
+  font-size: 1.25rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.btn-cancel,
+.btn-silence {
+  display: inline-block;
+  margin: 0.5rem;
+  padding: 0.75rem 1.5rem;
   font-size: 1rem;
-  background: #cc0000;
-  color: #fff;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
+
+.btn-cancel {
+  background: #cc0000;
+  color: #fff;
+}
+
 .btn-cancel:disabled {
   background: #999;
-  cursor: default;
+  cursor: not-allowed;
 }
-.status {
-  margin-top: 1rem;
-  color: #555;
+
+.btn-silence {
+  background: #666;
+  color: #fff;
+}
+
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+#btn-start {
+  padding: 1rem 2rem;
+  font-size: 1.25rem;
+  border: none;
+  border-radius: 5px;
+  background: #0077cc;
+  color: #fff;
+  cursor: pointer;
 }
