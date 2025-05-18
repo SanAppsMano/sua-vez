@@ -1,0 +1,9 @@
+{
+  "name": "sua-vez",
+  "version": "1.0.0",
+  "description": "Servidor serverless para fila virtual",
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "ioredis": "^5.0.0"
+  }
+}
