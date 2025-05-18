@@ -1,13 +1,17 @@
-const { v4: uuidv4 } = require("uuid");
-const Redis = require("ioredis");
-const redis = new Redis(process.env.REDIS_URL);
+import { Redis } from "@upstash/redis";
+import { v4 as uuidv4 } from "uuid";
 
-exports.handler = async () => {
-  const clientId = uuidv4();
+// Cria o client HTTP lendo das env vars
+const redis = Redis.fromEnv();
+
+export async function handler(event, context) {
+  // Gera clientId e incrementa contador atômico
+  const clientId     = uuidv4();
   const ticketNumber = await redis.incr("ticketCounter");
   await redis.set(`ticket:${clientId}`, ticketNumber);
+
   return {
     statusCode: 200,
     body: JSON.stringify({ clientId, ticketNumber }),
   };
-};
+}
