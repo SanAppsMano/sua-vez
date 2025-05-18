@@ -1,9 +1,17 @@
 {
   "name": "sua-vez",
   "version": "1.0.0",
-  "description": "Servidor serverless para fila virtual",
+  "description": "Serverless functions e front-end estático para a fila virtual SuaVez",
+  "type": "module",
+  "main": "functions/entrar.js",
+  "scripts": {
+    "build": "echo \"Sem build necessário para funções serverless\""
+  },
   "dependencies": {
-    "uuid": "^9.0.0",
-    "ioredis": "^5.0.0"
+    "@upstash/redis": "^1.20.0",
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=16"
   }
 }
