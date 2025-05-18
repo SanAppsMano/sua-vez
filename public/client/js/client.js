@@ -1,47 +1,46 @@
 // public/client/js/client.js
 
-// Elementos do DOM
-const ticketEl    = document.getElementById("ticket");
-const statusEl    = document.getElementById("status");
-const btnCancel   = document.getElementById("btn-cancel");
-const btnSilence  = document.getElementById("btn-silence");
-const alertSound  = document.getElementById("alert-sound");
+const ticketEl   = document.getElementById("ticket");
+const statusEl   = document.getElementById("status");
+const btnCancel  = document.getElementById("btn-cancel");
+const btnSilence = document.getElementById("btn-silence");
+const btnStart   = document.getElementById("btn-start");
+const overlay    = document.getElementById("overlay");
+const alertSound = document.getElementById("alert-sound");
 
 let clientId, ticketNumber;
-let polling;        // interval de status
-let alertInterval;  // interval de repetição do alarme
+let polling, alertInterval;
+let silenced = false;
 
-// 0) Overlay para destravar áudio/vibração
-const overlay      = document.createElement("div");
-overlay.id         = "overlay";
-overlay.innerHTML  = `<button id="btn-start">Toque para ativar alertas</button>`;
-document.body.appendChild(overlay);
-const btnStart     = document.getElementById("btn-start");
+// 0) Destravar áudio/vibração/notificações
 btnStart.addEventListener("click", () => {
-  // destravar
-  alertSound.play().then(() => alertSound.pause()).catch(()=>{
-    /* ignore */ 
-  });
+  // Áudio
+  alertSound.play().then(() => alertSound.pause()).catch(()=>{});
+  // Vibração
   if (navigator.vibrate) navigator.vibrate(1);
+  // Notificações
   if ("Notification" in window) Notification.requestPermission();
+  // Esconder overlay
   overlay.remove();
-  // agora inicia o fluxo normal
+  // Ativar botão cancelar
+  btnCancel.disabled = false;
+  // Iniciar fluxo
   getTicket();
   polling = setInterval(checkStatus, 2000);
 });
 
-// 1) Pega o ticket
+// 1) Solicita ticket
 async function getTicket() {
   try {
     const res  = await fetch("/.netlify/functions/entrar");
     const data = await res.json();
-    clientId       = data.clientId;
-    ticketNumber  = data.ticketNumber;
-    ticketEl.textContent = ticketNumber;
-    statusEl.textContent = "Aguardando chamada...";
+    clientId      = data.clientId;
+    ticketNumber = data.ticketNumber;
+    ticketEl.textContent   = ticketNumber;
+    statusEl.textContent   = "Aguardando chamada...";
   } catch (e) {
+    console.error("Erro ao entrar:", e);
     statusEl.textContent = "Erro ao obter número. Recarregue.";
-    console.error("Erro entrar:", e);
   }
 }
 
@@ -52,12 +51,13 @@ async function checkStatus() {
     const res = await fetch("/.netlify/functions/status");
     const { currentCall } = await res.json();
 
-    // Atualiza feedback de quem está chamando
-    statusEl.textContent = currentCall === ticketNumber
-      ? "É a sua vez!" 
-      : `Chamando: ${currentCall}`;
+    // Atualiza status
+    if (currentCall !== ticketNumber) {
+      statusEl.textContent = `Chamando: ${currentCall}`;
+      return;
+    }
 
-    // Se é sua vez e não há batch de alertas ativo, dispara
+    // Se for sua vez e não estiver em alerta
     if (currentCall === ticketNumber && !alertInterval) {
       alertUser();
     }
@@ -68,24 +68,28 @@ async function checkStatus() {
 
 // 3) Dispara e repete alerta
 function alertUser() {
-  btnSilence.hidden = false;
+  statusEl.textContent = "É a sua vez!";
+  btnSilence.hidden    = false;
 
   const doAlert = () => {
+    if (silenced) return;
     alertSound.currentTime = 0;
-    alertSound.play().catch(()=>{});
-    if (navigator.vibrate) navigator.vibrate([200,100,200]);
+    alertSound.play().catch(err => console.warn("play() falhou:", err));
+    if (navigator.vibrate) {
+      const ok = navigator.vibrate([200,100,200]);
+      console.log("vibrate:", ok);
+    }
   };
 
-  // Alerta imediato e depois a cada 5 s
+  // Primeira chamada imediata
   doAlert();
+  // Repetir a cada 5 s
   alertInterval = setInterval(doAlert, 5000);
-
-  // Desabilita “Desistir” enquanto estiver alertando
-  btnCancel.disabled = true;
 }
 
-// 4) Silenciar o alertInterval atual
+// 4) Silenciar alerta (apenas este ciclo)
 btnSilence.addEventListener("click", () => {
+  silenced = true;
   clearInterval(alertInterval);
   alertInterval = null;
   alertSound.pause();
@@ -94,12 +98,11 @@ btnSilence.addEventListener("click", () => {
   btnSilence.hidden = true;
 });
 
-// 5) Cancelar ticket
+// 5) Desistir da fila
 btnCancel.addEventListener("click", async () => {
   btnCancel.disabled = true;
   statusEl.textContent = "Cancelando...";
   clearInterval(alertInterval);
-  alertInterval = null;
   try {
     await fetch("/.netlify/functions/cancelar", {
       method: "POST",
