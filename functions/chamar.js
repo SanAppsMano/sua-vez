@@ -1,17 +1,21 @@
 // functions/chamar.js
 import { Redis } from "@upstash/redis";
 
-export async function handler() {
+export async function handler(event) {
   const redis = Redis.fromEnv();
 
-  // Incrementa o contador de chamadas
-  const nextNumber = await redis.incr("callCounter");
+  // Pega query param “num”; se existir, força esse número
+  const url    = new URL(event.rawUrl);
+  const param  = url.searchParams.get("num");
+  const next   = param
+    ? Number(param)
+    : await redis.incr("callCounter");
 
-  // Atualiza o número atual chamado
-  await redis.set("currentCall", nextNumber);
+  // Atualiza o “currentCall” para next
+  await redis.set("currentCall", next);
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ called: nextNumber }),
+    body: JSON.stringify({ called: next }),
   };
 }
