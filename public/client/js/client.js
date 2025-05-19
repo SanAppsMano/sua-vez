@@ -47,17 +47,22 @@ async function checkStatus() {
     const { currentCall, timestamp } = await res.json();
 
     // Atualiza exibição
-    statusEl.textContent = currentCall === ticketNumber
-      ? "É a sua vez!"
-      : `Chamando: ${currentCall}`;
+    if (currentCall !== ticketNumber) {
+      statusEl.textContent = `Chamando: ${currentCall}`;
+      statusEl.classList.remove("blink");
+      btnCancel.disabled = false;
+      return;
+    }
 
-    // Controla habilitação de 'Desistir'
-    btnCancel.disabled = (currentCall === ticketNumber);
+    // Sua vez
+    statusEl.textContent = "É a sua vez!";
+    statusEl.classList.add("blink");
+    btnCancel.disabled = true;
 
-    // Se for sua vez e evento novo
-    if (currentCall === ticketNumber && timestamp > lastEventTs) {
-      silenced      = false;
-      lastEventTs   = timestamp;
+    // Se for um evento novo, reinicia alertas
+    if (timestamp > lastEventTs) {
+      silenced     = false;
+      lastEventTs  = timestamp;
       alertUser();
     }
   } catch (e) {
@@ -68,19 +73,17 @@ async function checkStatus() {
 // 3) Dispara e repete alerta
 function alertUser() {
   btnSilence.hidden = false;
-
   const doAlert = () => {
     if (silenced) return;
     alertSound.currentTime = 0;
     alertSound.play().catch(() => {});
     if (navigator.vibrate) navigator.vibrate([200,100,200]);
   };
-
   doAlert();
   alertInterval = setInterval(doAlert, 5000);
 }
 
-// 4) Silenciar apenas o ciclo atual
+// 4) Silenciar apenas o ciclo atual (audio/vibração)
 btnSilence.addEventListener("click", () => {
   silenced = true;
   clearInterval(alertInterval);
@@ -88,6 +91,7 @@ btnSilence.addEventListener("click", () => {
   alertSound.currentTime = 0;
   if (navigator.vibrate) navigator.vibrate(0);
   btnSilence.hidden = true;
+  // mantém o blink ativo
 });
 
 // 5) Desistir da fila
@@ -104,6 +108,7 @@ btnCancel.addEventListener("click", async () => {
     clearInterval(polling);
     statusEl.textContent = "Você saiu da fila.";
     ticketEl.textContent = "–";
+    statusEl.classList.remove("blink");
   } catch (e) {
     console.error("Erro ao cancelar:", e);
     statusEl.textContent = "Falha ao desistir. Tente novamente.";
