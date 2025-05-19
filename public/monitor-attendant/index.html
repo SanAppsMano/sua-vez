@@ -24,7 +24,7 @@
   </header>
 
   <main class="main">
-    <!-- Painel de Identificador -->
+    <!-- Identificador -->
     <section class="id-panel">
       <label for="attendant-id">Identificador:</label>
       <input type="text" id="attendant-id" placeholder="Ex: Sala1 ou Sandes" />
@@ -32,7 +32,7 @@
 
     <!-- Painel de Chamada -->
     <section class="call-panel">
-      <div id="display-call" class="display">
+      <div class="display">
         Chamando: <span id="current-call">–</span>
         <small id="current-id" class="id-label"></small>
       </div>
@@ -48,11 +48,10 @@
         Em espera: <span id="waiting-count">–</span> clientes
       </div>
 
-      <!-- Botão de Reset -->
       <button id="btn-reset" class="btn btn-warning">Resetar Tickets</button>
     </section>
 
-    <!-- Histórico de Cancelados -->
+    <!-- Lista de Cancelados -->
     <section class="history-panel">
       <h2>Cancelados</h2>
       <ul id="cancel-list" class="list"></ul>
