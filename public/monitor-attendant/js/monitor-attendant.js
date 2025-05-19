@@ -25,19 +25,19 @@ async function initApp() {
   const waitingEl     = document.getElementById('waiting-count');
   const cancelListEl  = document.getElementById('cancel-list');
 
-  const btnNext    = document.getElementById('btn-next');
-  const btnRepeat  = document.getElementById('btn-repeat');
-  const inputManual= document.getElementById('manual-input');
-  const btnManual  = document.getElementById('btn-manual');
-  const btnReset   = document.getElementById('btn-reset');
-  const idInput    = document.getElementById('attendant-id');
+  const btnNext      = document.getElementById('btn-next');
+  const btnRepeat    = document.getElementById('btn-repeat');
+  const inputManual  = document.getElementById('manual-input');
+  const btnManual    = document.getElementById('btn-manual');
+  const btnReset     = document.getElementById('btn-reset');
+  const idInput      = document.getElementById('attendant-id');
 
   let callCounter = 0;
 
   // Formata timestamp para hora local
   const fmtTime = ts => new Date(ts).toLocaleTimeString();
 
-  // Atualiza display de chamada e reenvia fetch de listas
+  // Atualiza display de chamada e listas
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num;
@@ -100,16 +100,22 @@ async function initApp() {
     }
   }
 
-  // Busca quantos estão em espera (talvez implementar endpoint futuro)
+  // Busca quantos estão em espera (ticketCounter - callCounter)
   async function fetchWaiting() {
-    // Placeholder: implementar se desejar ler ticketCounter
-    waitingEl.textContent = '–';
+    try {
+      const { ticketCounter, currentCall } = await (await fetch('/.netlify/functions/status')).json();
+      const waiting = ticketCounter - currentCall;
+      waitingEl.textContent = waiting >= 0 ? waiting : 0;
+    } catch (e) {
+      console.error('Erro ao buscar espera:', e);
+    }
   }
 
-  // Inicialização: atualiza display e dispara polling
+  // Inicializa display e listas
   const { currentCall, attendant } = await (await fetch('/.netlify/functions/status')).json();
   updateCall(currentCall, attendant);
 
-  // Polling periódico para refresh de cancelados (clientes que desistiram)
+  // Polling periódico para recarregar cancelados e espera
   setInterval(fetchCancelled, 5000);
+  setInterval(fetchWaiting, 5000);
 }
