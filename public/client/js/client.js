@@ -1,21 +1,21 @@
 // public/client/js/client.js
 
-const ticketEl    = document.getElementById("ticket");
-const statusEl    = document.getElementById("status");
-const btnCancel   = document.getElementById("btn-cancel");
-const btnSilence  = document.getElementById("btn-silence");
-const btnStart    = document.getElementById("btn-start");
-const overlay     = document.getElementById("overlay");
-const alertSound  = document.getElementById("alert-sound");
+// elementos
+const ticketEl   = document.getElementById("ticket");
+const statusEl   = document.getElementById("status");
+const btnCancel  = document.getElementById("btn-cancel");
+const btnSilence = document.getElementById("btn-silence");
+const btnStart   = document.getElementById("btn-start");
+const overlay    = document.getElementById("overlay");
+const alertSound = document.getElementById("alert-sound");
 
 let clientId, ticketNumber;
 let polling, alertInterval;
 let lastEventTs = 0;
 let silenced   = false;
 
-// 0) Destravar alertas com um toque
 btnStart.addEventListener("click", () => {
-  alertSound.play().then(() => alertSound.pause()).catch(() => {});
+  alertSound.play().then(() => alertSound.pause()).catch(()=>{});
   if (navigator.vibrate) navigator.vibrate(1);
   if ("Notification" in window) Notification.requestPermission();
   overlay.remove();
@@ -24,66 +24,50 @@ btnStart.addEventListener("click", () => {
   polling = setInterval(checkStatus, 2000);
 });
 
-// 1) Solicita ticket
 async function getTicket() {
-  try {
-    const res  = await fetch("/.netlify/functions/entrar");
-    const data = await res.json();
-    clientId      = data.clientId;
-    ticketNumber  = data.ticketNumber;
-    ticketEl.textContent  = ticketNumber;
-    statusEl.textContent  = "Aguardando chamada...";
-  } catch (e) {
-    console.error("Erro entrar:", e);
-    statusEl.textContent = "Erro ao obter número. Recarregue.";
-  }
+  const res = await fetch("/.netlify/functions/entrar");
+  const data = await res.json();
+  clientId      = data.clientId;
+  ticketNumber  = data.ticketNumber;
+  ticketEl.textContent = ticketNumber;
+  statusEl.textContent = "Aguardando chamada...";
 }
 
-// 2) Polling de status
 async function checkStatus() {
   if (!ticketNumber) return;
-  try {
-    const res = await fetch("/.netlify/functions/status");
-    const { currentCall, timestamp } = await res.json();
+  const res = await fetch("/.netlify/functions/status");
+  const { currentCall, timestamp, attendant } = await res.json();
 
-    // Atualiza exibição
-    if (currentCall !== ticketNumber) {
-      statusEl.textContent = `Chamando: ${currentCall}`;
-      statusEl.classList.remove("blink");
-      btnCancel.disabled = false;
-      return;
-    }
+  if (currentCall !== ticketNumber) {
+    statusEl.textContent = `Chamando: ${currentCall} (${attendant})`;
+    btnCancel.disabled = false;
+    statusEl.classList.remove("blink");
+    return;
+  }
 
-    // Sua vez
-    statusEl.textContent = "É a sua vez!";
-    statusEl.classList.add("blink");
-    btnCancel.disabled = true;
+  statusEl.textContent = `É a sua vez! (Atendente: ${attendant})`;
+  statusEl.classList.add("blink");
+  btnCancel.disabled = true;
 
-    // Se for um evento novo, reinicia alertas
-    if (timestamp > lastEventTs) {
-      silenced     = false;
-      lastEventTs  = timestamp;
-      alertUser();
-    }
-  } catch (e) {
-    console.error("Erro status:", e);
+  if (timestamp > lastEventTs) {
+    silenced    = false;
+    lastEventTs = timestamp;
+    alertUser();
   }
 }
 
-// 3) Dispara e repete alerta
 function alertUser() {
   btnSilence.hidden = false;
   const doAlert = () => {
     if (silenced) return;
     alertSound.currentTime = 0;
-    alertSound.play().catch(() => {});
+    alertSound.play().catch(()=>{});
     if (navigator.vibrate) navigator.vibrate([200,100,200]);
   };
   doAlert();
   alertInterval = setInterval(doAlert, 5000);
 }
 
-// 4) Silenciar apenas o ciclo atual (audio/vibração)
 btnSilence.addEventListener("click", () => {
   silenced = true;
   clearInterval(alertInterval);
@@ -91,27 +75,19 @@ btnSilence.addEventListener("click", () => {
   alertSound.currentTime = 0;
   if (navigator.vibrate) navigator.vibrate(0);
   btnSilence.hidden = true;
-  // mantém o blink ativo
 });
 
-// 5) Desistir da fila
 btnCancel.addEventListener("click", async () => {
   btnCancel.disabled = true;
   statusEl.textContent = "Cancelando...";
   clearInterval(alertInterval);
-  try {
-    await fetch("/.netlify/functions/cancelar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId })
-    });
-    clearInterval(polling);
-    statusEl.textContent = "Você saiu da fila.";
-    ticketEl.textContent = "–";
-    statusEl.classList.remove("blink");
-  } catch (e) {
-    console.error("Erro ao cancelar:", e);
-    statusEl.textContent = "Falha ao desistir. Tente novamente.";
-    btnCancel.disabled = false;
-  }
+  await fetch("/.netlify/functions/cancelar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId })
+  });
+  clearInterval(polling);
+  statusEl.textContent = "Você saiu da fila.";
+  ticketEl.textContent = "–";
+  statusEl.classList.remove("blink");
 });
