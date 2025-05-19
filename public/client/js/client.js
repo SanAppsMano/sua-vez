@@ -24,53 +24,63 @@ btnStart.addEventListener("click", () => {
   polling = setInterval(checkStatus, 2000);
 });
 
-// 1) Pega ticket
+// 1) Solicita ticket
 async function getTicket() {
-  const res = await fetch("/.netlify/functions/entrar");
-  const data = await res.json();
-  clientId      = data.clientId;
-  ticketNumber  = data.ticketNumber;
-  ticketEl.textContent = ticketNumber;
-  statusEl.textContent = "Aguardando chamada...";
+  try {
+    const res  = await fetch("/.netlify/functions/entrar");
+    const data = await res.json();
+    clientId      = data.clientId;
+    ticketNumber  = data.ticketNumber;
+    ticketEl.textContent  = ticketNumber;
+    statusEl.textContent  = "Aguardando chamada...";
+  } catch (e) {
+    console.error("Erro entrar:", e);
+    statusEl.textContent = "Erro ao obter número. Recarregue.";
+  }
 }
 
-// 2) Polling lê currentCall E timestamp de evento
+// 2) Polling de status
 async function checkStatus() {
   if (!ticketNumber) return;
-  const res = await fetch("/.netlify/functions/status");
-  const { currentCall, timestamp } = await res.json();
+  try {
+    const res = await fetch("/.netlify/functions/status");
+    const { currentCall, timestamp } = await res.json();
 
-  // Atualiza a exibição
-  statusEl.textContent = 
-    currentCall === ticketNumber
+    // Atualiza exibição
+    statusEl.textContent = currentCall === ticketNumber
       ? "É a sua vez!"
       : `Chamando: ${currentCall}`;
 
-  // Se chegou a sua vez e é um evento novo
-  if (
-    currentCall === ticketNumber &&
-    timestamp > lastEventTs
-  ) {
-    silenced     = false;      // reseta silenciar
-    lastEventTs = timestamp;   // armazena ts deste evento
-    alertUser();
+    // Controla habilitação de 'Desistir'
+    btnCancel.disabled = (currentCall === ticketNumber);
+
+    // Se for sua vez e evento novo
+    if (currentCall === ticketNumber && timestamp > lastEventTs) {
+      silenced      = false;
+      lastEventTs   = timestamp;
+      alertUser();
+    }
+  } catch (e) {
+    console.error("Erro status:", e);
   }
 }
 
 // 3) Dispara e repete alerta
 function alertUser() {
   btnSilence.hidden = false;
+
   const doAlert = () => {
     if (silenced) return;
     alertSound.currentTime = 0;
     alertSound.play().catch(() => {});
     if (navigator.vibrate) navigator.vibrate([200,100,200]);
   };
+
   doAlert();
   alertInterval = setInterval(doAlert, 5000);
 }
 
-// 4) Silenciar só este ciclo de alertas
+// 4) Silenciar apenas o ciclo atual
 btnSilence.addEventListener("click", () => {
   silenced = true;
   clearInterval(alertInterval);
@@ -80,17 +90,23 @@ btnSilence.addEventListener("click", () => {
   btnSilence.hidden = true;
 });
 
-// 5) Desistir
+// 5) Desistir da fila
 btnCancel.addEventListener("click", async () => {
   btnCancel.disabled = true;
   statusEl.textContent = "Cancelando...";
   clearInterval(alertInterval);
-  await fetch("/.netlify/functions/cancelar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId })
-  });
-  clearInterval(polling);
-  statusEl.textContent = "Você saiu da fila.";
-  ticketEl.textContent = "–";
+  try {
+    await fetch("/.netlify/functions/cancelar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId })
+    });
+    clearInterval(polling);
+    statusEl.textContent = "Você saiu da fila.";
+    ticketEl.textContent = "–";
+  } catch (e) {
+    console.error("Erro ao cancelar:", e);
+    statusEl.textContent = "Falha ao desistir. Tente novamente.";
+    btnCancel.disabled = false;
+  }
 });
