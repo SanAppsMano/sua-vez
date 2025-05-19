@@ -1,4 +1,6 @@
-// Autenticação + lógica com reset e identificador
+// public/monitor-attendant/js/monitor-attendant.js
+
+// Constante de autenticação — altere para sua senha real
 const AUTH_PASSWORD = 'suaSenhaSegura';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -32,8 +34,10 @@ async function initApp() {
 
   let callCounter = 0;
 
+  // Formata timestamp para hora local
   const fmtTime = ts => new Date(ts).toLocaleTimeString();
 
+  // Atualiza display de chamada e reenvia fetch de listas
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num;
@@ -42,6 +46,7 @@ async function initApp() {
     fetchWaiting();
   }
 
+  // Botão Próximo
   btnNext.onclick = async () => {
     const id  = idInput.value.trim();
     const url = `/.netlify/functions/chamar${id?`?id=${encodeURIComponent(id)}`:''}`;
@@ -49,6 +54,7 @@ async function initApp() {
     updateCall(called, attendant);
   };
 
+  // Botão Repetir
   btnRepeat.onclick = async () => {
     const id  = idInput.value.trim();
     const url = `/.netlify/functions/chamar?num=${callCounter}${id?`&id=${encodeURIComponent(id)}`:''}`;
@@ -56,6 +62,7 @@ async function initApp() {
     updateCall(called, attendant);
   };
 
+  // Botão Chamar Manual
   btnManual.onclick = async () => {
     const num = Number(inputManual.value);
     if (!num) return alert('Digite um número válido');
@@ -65,7 +72,7 @@ async function initApp() {
     updateCall(called, attendant);
   };
 
-  // Reset de contadores
+  // Botão Resetar Tickets
   btnReset.onclick = async () => {
     if (!confirm('Confirma resetar todos os tickets para 1?')) return;
     const id  = idInput.value.trim();
@@ -75,23 +82,34 @@ async function initApp() {
     alert('Contadores resetados.');
   };
 
-  // Busca cancelados
+  // Busca lista de cancelados
   async function fetchCancelled() {
-    const { cancelled } = await (await fetch('/.netlify/functions/cancelados')).json();
-    cancelListEl.innerHTML = '';
-    cancelled.forEach(item => {
-      const li = document.createElement('li');
-      li.innerHTML = `<span>${item.ticket}</span><span class="ts">${fmtTime(item.ts)}</span>`;
-      cancelListEl.appendChild(li);
-    });
+    try {
+      const { cancelled } = await (await fetch('/.netlify/functions/cancelados')).json();
+      cancelListEl.innerHTML = '';
+      cancelled.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span>${item.ticket}</span>
+          <span class="ts">${fmtTime(item.ts)}</span>
+        `;
+        cancelListEl.appendChild(li);
+      });
+    } catch (e) {
+      console.error('Erro ao buscar cancelados:', e);
+    }
   }
 
-  // Em espera (a implementar endpoint de total se desejar)
+  // Busca quantos estão em espera (talvez implementar endpoint futuro)
   async function fetchWaiting() {
+    // Placeholder: implementar se desejar ler ticketCounter
     waitingEl.textContent = '–';
   }
 
-  // Inicialização
+  // Inicialização: atualiza display e dispara polling
   const { currentCall, attendant } = await (await fetch('/.netlify/functions/status')).json();
   updateCall(currentCall, attendant);
+
+  // Polling periódico para refresh de cancelados (clientes que desistiram)
+  setInterval(fetchCancelled, 5000);
 }
