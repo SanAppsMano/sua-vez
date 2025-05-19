@@ -8,9 +8,17 @@
   --text:    #333333;
   --muted:   #777777;
   --danger:  #d0021b;
-  --success: #4caf50;
   --radius:  8px;
   --font:    'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Blink animation */
+@keyframes blink {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75%     { opacity: 0; }
+}
+.blink {
+  animation: blink 1s linear infinite;
 }
 
 * {
@@ -70,7 +78,6 @@ button {
   color: #fff;
   margin-bottom: 0.5rem;
 }
-
 .btn-cancel:disabled {
   background: #bbb;
   cursor: not-allowed;
@@ -81,7 +88,6 @@ button {
   color: #fff;
   margin-bottom: 1rem;
 }
-
 .btn-silence:disabled {
   background: #bbb;
   cursor: not-allowed;
@@ -98,11 +104,11 @@ button {
   padding: 1rem;
   z-index: 10;
 }
-
 #btn-start {
   width: auto;
   padding: 1rem 2rem;
   font-size: 1.25rem;
   background: var(--primary);
   color: #fff;
+  border-radius: var(--radius);
 }
