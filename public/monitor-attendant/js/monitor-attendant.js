@@ -51,9 +51,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const qrContainer    = document.getElementById('qrcode');
   const qrOverlay      = document.createElement('div');
   qrOverlay.id = 'qrcode-overlay';
-  qrOverlay.hidden = true;
+  Object.assign(qrOverlay.style, {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.8)', display: 'none',
+    alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    padding: '1rem'
+  });
   const qrOverlayContent = document.createElement('div');
   qrOverlayContent.id = 'qrcode-overlay-content';
+  Object.assign(qrOverlayContent.style, {
+    background: '#fff', padding: '1rem', borderRadius: '8px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.3)', maxWidth: '90%', maxHeight: '90%'
+  });
   qrOverlay.appendChild(qrOverlayContent);
   document.body.appendChild(qrOverlay);
 
@@ -61,27 +70,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
-  // Gera QR Code para o cliente
   function renderQRCode(tId) {
     qrContainer.innerHTML = '';
     qrOverlayContent.innerHTML = '';
-    const urlCliente = location.origin + '/client/?t=' + tId;
-    // principal
+    const urlCliente = `${location.origin}/client/?t=${tId}`;
     new QRCode(qrContainer, { text: urlCliente, width: 128, height: 128 });
-    // overlay
     new QRCode(qrOverlayContent, { text: urlCliente, width: 256, height: 256 });
 
-    // click to expand and copy
     qrContainer.style.cursor = 'pointer';
     qrContainer.onclick = () => {
-      // copy link
       navigator.clipboard.writeText(urlCliente).then(() => {
-        // show overlay
-        qrOverlay.hidden = false;
+        qrOverlay.style.display = 'flex';
       });
     };
-    // hide overlay on click
-    qrOverlay.onclick = () => { qrOverlay.hidden = true; };
+    qrOverlay.onclick = (e) => {
+      if (e.target === qrOverlay) qrOverlay.style.display = 'none';
+    };
   }
 
   // ■■■ Onboarding ■■■
@@ -95,15 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const newTenant = tenantId || crypto.randomUUID().split('-')[0];
       const res = await fetch('/.netlify/functions/registerMonitor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: newTenant, label: label, password: pw })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: newTenant, label, password: pw })
       });
-      if (!res.ok) throw new Error('Registro falhou');
-      const data = await res.json();
-      if (!data.success) throw new Error('Registro inválido');
+      const { success } = await res.json();
+      if (!success) throw new Error('Registro inválido');
       localStorage.setItem('tenantId', newTenant);
-      history.replaceState(null, '', '/monitor-attendant/?t=' + newTenant);
+      history.replaceState(null, '', `/monitor-attendant/?t=${newTenant}`);
       showApp(label, newTenant);
     } catch (e) {
       console.error(e);
@@ -119,16 +121,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      const t = tenantId;
-      const res = await fetch('/.netlify/functions/validatePassword?t=' + t, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`/.netlify/functions/validatePassword?t=${tenantId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw })
       });
       const { valid, label } = await res.json();
       if (valid) {
-        history.replaceState(null, '', '/monitor-attendant/?t=' + t);
-        showApp(label, t);
+        history.replaceState(null, '', `/monitor-attendant/?t=${tenantId}`);
+        showApp(label, tenantId);
       } else {
         loginError.textContent = 'Senha incorreta.';
       }
@@ -138,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // ■■■ Mostrar UI principal ■■■
   async function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
@@ -150,17 +149,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp(tId);
   }
 
-  // Fluxo inicial: onboarding vs login
   (async () => {
     if (!tenantId) {
-      onboardOverlay.hidden = false;
-      loginOverlay.hidden   = true;
+      onboardOverlay.hidden = false; loginOverlay.hidden = true;
     } else {
       onboardOverlay.hidden = true;
-      const res = await fetch('/.netlify/functions/getTenantConfig?t=' + tenantId);
-      if (res.ok) {
-        loginOverlay.hidden = false;
-      } else {
+      const res = await fetch(`/.netlify/functions/getTenantConfig?t=${tenantId}`);
+      if (res.ok) loginOverlay.hidden = false;
+      else {
         localStorage.removeItem('tenantId');
         history.replaceState(null, '', '/monitor-attendant/');
         onboardOverlay.hidden = false;
@@ -168,99 +164,81 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // ■■■ Lógica Principal ■■■
   function initApp(t) {
-    fetchStatus(t);
-    fetchCancelled(t);
+    fetchStatus(t); fetchCancelled(t);
     setInterval(() => fetchStatus(t), 5000);
     setInterval(() => fetchCancelled(t), 5000);
 
     btnNext.onclick = async () => {
       const id = attendantInput.value.trim();
-      let url = '/.netlify/functions/chamar?t=' + t;
-      if (id) url += '&id=' + encodeURIComponent(id);
+      let url = `/.netlify/functions/chamar?t=${t}`;
+      if (id) url += `&id=${encodeURIComponent(id)}`;
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
 
     btnRepeat.onclick = async () => {
-      const id = attendantInput.value.trim();
-      let url = '/.netlify/functions/chamar?t=' + t + '&num=' + callCounter;
-      if (id) url += '&id=' + encodeURIComponent(id);
+      let url = `/.netlify/functions/chamar?t=${t}&num=${callCounter}`;
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
 
     btnManual.onclick = async () => {
       const num = Number(selectManual.value);
-      if (!num) return alert('Selecione um ticket válido');
-      const id = attendantInput.value.trim();
-      let url = '/.netlify/functions/chamar?t=' + t + '&num=' + num;
-      if (id) url += '&id=' + encodeURIComponent(id);
+      if (!num) return;
+      const url = `/.netlify/functions/chamar?t=${t}&num=${num}`;
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
 
     btnReset.onclick = async () => {
       if (!confirm('Confirma resetar todos os tickets para 1?')) return;
-      const id = attendantInput.value.trim();
-      let url = '/.netlify/functions/reset?t=' + t;
-      if (id) url += '&id=' + encodeURIComponent(id);
-      const res = await fetch(url, { method: 'POST' });
-      if (res.ok) updateCall(0, '');
+      await fetch(`/.netlify/functions/reset?t=${t}`, { method: 'POST' });
+      updateCall(0, '');
     };
   }
 
-  // Atualiza chamada atual
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num > 0 ? num : '–';
     currentIdEl.textContent   = attendantId || '';
   }
 
-  // Busca status (chamados e tickets)
   async function fetchStatus(t) {
     try {
-      const res = await fetch('/.netlify/functions/status?t=' + t);
+      const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
-      callCounter     = currentCall;
-      ticketCounter   = tc;
+      callCounter = currentCall; ticketCounter = tc;
       currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
-      currentIdEl.textContent   = attendant || '';
-      waitingEl.textContent     = currentCall < tc ? tc - currentCall : 0;
+      waitingEl.textContent = Math.max(0, tc - currentCall);
       updateManualOptions();
     } catch (e) {
-      console.error('Erro ao buscar status:', e);
+      console.error(e);
     }
   }
 
-  // Preenche dropdown manual
   function updateManualOptions() {
     selectManual.innerHTML = '<option value="">Selecione...</option>';
     for (let i = callCounter + 1; i <= ticketCounter; i++) {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = i;
+      const opt = document.createElement('option'); opt.value = i; opt.textContent = i;
       selectManual.appendChild(opt);
     }
     selectManual.disabled = callCounter + 1 > ticketCounter;
   }
 
-  // Busca lista de cancelados
   async function fetchCancelled(t) {
     try {
-      const res = await fetch('/.netlify/functions/cancelados?t=' + t);
-      const body = await res.json();
-      const list = Array.isArray(body.cancelled) ? body.cancelled : [];
+      const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
+      const { cancelled } = await res.json();
       cancelListEl.innerHTML = '';
-      list.forEach(item => {
+      cancelled.forEach(({ ticket, ts }) => {
         const li = document.createElement('li');
-        li.innerHTML = '<span>' + item.ticket + '</span>' +
-                       '<span class="ts">' + fmtTime(item.ts) + '</span>';
+        li.innerHTML = `<span>${ticket}</span>` +
+                       `<span class="ts">${fmtTime(ts)}</span>`;
         cancelListEl.appendChild(li);
       });
     } catch (e) {
-      console.error('Erro ao buscar cancelados:', e);
+      console.error(e);
     }
   }
 });
