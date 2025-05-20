@@ -14,25 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const storedTenant = localStorage.getItem('tenantId');
   const tenantId     = tenantParam || storedTenant;
 
-  // Elementos principais
+  // Overlays e seções
   const onboardOverlay = document.getElementById('onboard-overlay');
   const loginOverlay   = document.getElementById('login-overlay');
   const headerEl       = document.querySelector('.header');
   const mainEl         = document.querySelector('.main');
   const bodyEl         = document.body;
 
-  // Onboarding inputs
+  // Onboarding
   const onboardLabel    = document.getElementById('onboard-label');
   const onboardPassword = document.getElementById('onboard-password');
   const onboardSubmit   = document.getElementById('onboard-submit');
   const onboardError    = document.getElementById('onboard-error');
 
-  // Login inputs
+  // Login
   const loginPassword = document.getElementById('login-password');
   const loginSubmit   = document.getElementById('login-submit');
   const loginError    = document.getElementById('login-error');
 
-  // Tela principal
+  // UI principal
   const headerLabel    = document.getElementById('header-label');
   const attendantInput = document.getElementById('attendant-id');
   const currentCallEl  = document.getElementById('current-call');
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
-  // ■■■ Onboarding & Registration ■■■
+  // ■■■ Onboarding ■■■
   onboardSubmit.onclick = async () => {
     const label = onboardLabel.value.trim();
     const pw    = onboardPassword.value;
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // ■■■ Login Existing Tenant ■■■
+  // ■■■ Login ■■■
   loginSubmit.onclick = async () => {
     const pw = loginPassword.value;
     if (!pw) {
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // ■■■ Mostrar UI principal após auth ■■■
+  // ■■■ Mostrar UI principal ■■■
   async function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
@@ -110,10 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
     bodyEl.classList.add('authenticated');
     headerLabel.textContent = label;
     localStorage.setItem('tenantId', tId);
-    await initApp(tId);
+    initApp(tId);
   }
 
-  // Fluxo inicial: decide mostrar onboarding ou login
+  // Fluxo inicial: on-board vs login
   (async () => {
     if (!tenantId) {
       onboardOverlay.hidden = false;
@@ -131,9 +131,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  // ■■■ Lógica Principal: chamadas, cancelados, polling ■■■
-  async function initApp(t) {
-    await fetchStatus(t);
+  // ■■■ Lógica Principal ■■■
+  function initApp(t) {
+    // Carrega apenas status e cancelados, sem chamar
+    fetchStatus(t);
     fetchCancelled(t);
     setInterval(() => fetchStatus(t), 5000);
     setInterval(() => fetchCancelled(t), 5000);
@@ -171,29 +172,32 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  // Atualiza chamada atual
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num;
     currentIdEl.textContent   = attendantId || '';
   }
 
+  // Busca status (chamados e tickets)
   async function fetchStatus(t) {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
       callCounter     = currentCall;
       ticketCounter   = tc;
-      currentCallEl.textContent = currentCall;
+      currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
       currentIdEl.textContent   = attendant || '';
-      waitingEl.textContent     = Math.max(0, tc - currentCall);
+      waitingEl.textContent     = currentCall < tc ? tc - currentCall : 0;
       updateManualOptions();
     } catch (e) {
       console.error('Erro ao buscar status:', e);
     }
   }
 
+  // Preenche dropdown manual
   function updateManualOptions() {
-    selectManual.innerHTML = '<option value=\"\">Selecione...</option>';
+    selectManual.innerHTML = '<option value="">Selecione...</option>';
     for (let i = callCounter + 1; i <= ticketCounter; i++) {
       const opt = document.createElement('option');
       opt.value = i;
@@ -203,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectManual.disabled = callCounter + 1 > ticketCounter;
   }
 
+  // Busca lista de cancelados
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
@@ -212,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const li = document.createElement('li');
         li.innerHTML = `
           <span>${item.ticket}</span>
-          <span class=\"ts\">${fmtTime(item.ts)}</span>
+          <span class="ts">${fmtTime(item.ts)}</span>
         `;
         cancelListEl.appendChild(li);
       });
