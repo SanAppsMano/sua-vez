@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     try {
       const newTenant = tenantId || crypto.randomUUID().split('-')[0];
-      const res = await fetch('/.netlify/functions/registerMonitor', {
+      const res = await fetch(`/.netlify/functions/registerMonitor?t=${newTenant}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId: newTenant, label, password: pw })
       });
@@ -151,7 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   (async () => {
     if (!tenantId) {
-      onboardOverlay.hidden = false; loginOverlay.hidden = true;
+      onboardOverlay.hidden = false;
+      loginOverlay.hidden = true;
     } else {
       onboardOverlay.hidden = true;
       const res = await fetch(`/.netlify/functions/getTenantConfig?t=${tenantId}`);
@@ -165,7 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 
   function initApp(t) {
-    fetchStatus(t); fetchCancelled(t);
+    fetchStatus(t);
+    fetchCancelled(t);
     setInterval(() => fetchStatus(t), 5000);
     setInterval(() => fetchCancelled(t), 5000);
 
@@ -208,7 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
-      callCounter = currentCall; ticketCounter = tc;
+      callCounter = currentCall;
+      ticketCounter = tc;
       currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
       waitingEl.textContent = Math.max(0, tc - currentCall);
       updateManualOptions();
@@ -220,7 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateManualOptions() {
     selectManual.innerHTML = '<option value="">Selecione...</option>';
     for (let i = callCounter + 1; i <= ticketCounter; i++) {
-      const opt = document.createElement('option'); opt.value = i; opt.textContent = i;
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = i;
       selectManual.appendChild(opt);
     }
     selectManual.disabled = callCounter + 1 > ticketCounter;
@@ -229,16 +234,17 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
-      const { cancelled } = await res.json();
+      const data = await res.json();
+      const list = Array.isArray(data.cancelled) ? data.cancelled : [];
       cancelListEl.innerHTML = '';
-      cancelled.forEach(({ ticket, ts }) => {
+      list.forEach(({ ticket, ts }) => {
         const li = document.createElement('li');
         li.innerHTML = `<span>${ticket}</span>` +
-                       `<span class="ts">${fmtTime(ts)}</span>`;
+                       `<span class=\"ts\">${fmtTime(ts)}</span>`;
         cancelListEl.appendChild(li);
       });
     } catch (e) {
-      console.error(e);
+      console.error('Erro ao buscar cancelados:', e);
     }
   }
 });
