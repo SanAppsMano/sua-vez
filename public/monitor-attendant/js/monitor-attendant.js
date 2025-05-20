@@ -7,6 +7,7 @@
  * - Renderização de QR Code para a fila do cliente
  * - Dropdown manual com tickets disponíveis
  * - Chamadas, repetição, reset, polling de cancelados e espera
+ * - Interação QR: expandir e copiar link
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -46,20 +47,41 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnManual      = document.getElementById('btn-manual');
   const btnReset       = document.getElementById('btn-reset');
 
+  // QR Interaction
+  const qrContainer    = document.getElementById('qrcode');
+  const qrOverlay      = document.createElement('div');
+  qrOverlay.id = 'qrcode-overlay';
+  qrOverlay.hidden = true;
+  const qrOverlayContent = document.createElement('div');
+  qrOverlayContent.id = 'qrcode-overlay-content';
+  qrOverlay.appendChild(qrOverlayContent);
+  document.body.appendChild(qrOverlay);
+
   let callCounter   = 0;
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
   // Gera QR Code para o cliente
   function renderQRCode(tId) {
-    const container = document.getElementById('qrcode');
-    container.innerHTML = '';
+    qrContainer.innerHTML = '';
+    qrOverlayContent.innerHTML = '';
     const urlCliente = location.origin + '/client/?t=' + tId;
-    new QRCode(container, {
-      text: urlCliente,
-      width: 128,
-      height: 128
-    });
+    // principal
+    new QRCode(qrContainer, { text: urlCliente, width: 128, height: 128 });
+    // overlay
+    new QRCode(qrOverlayContent, { text: urlCliente, width: 256, height: 256 });
+
+    // click to expand and copy
+    qrContainer.style.cursor = 'pointer';
+    qrContainer.onclick = () => {
+      // copy link
+      navigator.clipboard.writeText(urlCliente).then(() => {
+        // show overlay
+        qrOverlay.hidden = false;
+      });
+    };
+    // hide overlay on click
+    qrOverlay.onclick = () => { qrOverlay.hidden = true; };
   }
 
   // ■■■ Onboarding ■■■
@@ -81,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!data.success) throw new Error('Registro inválido');
       localStorage.setItem('tenantId', newTenant);
-      // Atualiza URL sem recarregar
       history.replaceState(null, '', '/monitor-attendant/?t=' + newTenant);
       showApp(label, newTenant);
     } catch (e) {
@@ -118,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ■■■ Mostrar UI principal ■■■
-  function showApp(label, tId) {
+  async function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
     headerEl.hidden       = false;
