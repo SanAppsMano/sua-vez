@@ -10,8 +10,6 @@
  * - Interação QR: expandir e copiar link
  */
 
-import { v4 as uuidv4 } from 'https://jspm.dev/uuid';
-
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams     = new URL(location).searchParams;
   let token           = urlParams.get('t');
@@ -31,11 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const onboardPassword = document.getElementById('onboard-password');
   const onboardSubmit   = document.getElementById('onboard-submit');
   const onboardError    = document.getElementById('onboard-error');
-
-  // Login
-  const loginPassword = document.getElementById('login-password');
-  const loginSubmit   = document.getElementById('login-submit');
-  const loginError    = document.getElementById('login-error');
 
   // UI principal
   const headerLabel    = document.getElementById('header-label');
@@ -195,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2) Se vier ?t e ?empresa na URL, pede só senha
     if (token && empresaParam) {
-      loginOverlay.hidden = true;
+      loginOverlay.hidden   = true;
       onboardOverlay.hidden = true;
       try {
         const senhaPrompt = prompt(`Digite a senha de acesso para a empresa ${empresaParam}:`);
@@ -208,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { empresa } = await res.json();
         cfg = { empresa, senha: senhaPrompt };
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
-        // limpar URL e manter empresa
+        // manter apenas empresa na URL
         history.replaceState(null, '', `/monitor-attendant/?empresa=${encodeURIComponent(empresaParam)}`);
         showApp(empresa, token);
         return;
@@ -220,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3) Senão, exibir onboarding para trial
     onboardOverlay.hidden = false;
-    loginOverlay.hidden = true;
+    loginOverlay.hidden   = true;
 
     onboardSubmit.onclick = async () => {
       const label = onboardLabel.value.trim();
@@ -243,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cfg = { empresa: label, senha: pw };
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
         history.replaceState(
-          null, '', 
+          null, '',
           `/monitor-attendant/?t=${token}&empresa=${encodeURIComponent(label)}`
         );
         showApp(label, token);
