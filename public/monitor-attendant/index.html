@@ -5,44 +5,55 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>SuaVez Atendente</title>
   <link rel="stylesheet" href="css/monitor-attendant.css"/>
+  <!-- Biblioteca de QR Code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
-  
-  <!-- Overlay de Onboarding / Login -->
+  <!-- Overlay de Onboarding -->
   <div id="onboard-overlay">
     <div class="onboard-box">
       <h2>Configurar Monitor</h2>
       <label>Nome da Empresa</label>
       <input id="onboard-label" type="text" placeholder="Ex: Loja XYZ" />
       <label>Senha de Acesso</label>
-      <input id="onboard-password" type="password" placeholder="Defina uma senha" />
+      <input id="onboard-password" type="password" placeholder="Defina uma senha" autocomplete="new-password" />
       <button id="onboard-submit">Criar Monitor</button>
       <div id="onboard-error" class="error"></div>
     </div>
   </div>
 
-  <!-- Overlay de Login (único campo senha) -->
+  <!-- Overlay de Login -->
   <div id="login-overlay" hidden>
     <div class="login-box">
       <h2>Login Atendente</h2>
-      <input id="login-password" type="password" placeholder="Senha" autocomplete="off" />
+      <input id="login-password" type="password" placeholder="Senha" autocomplete="current-password" />
       <button id="login-submit">Entrar</button>
       <div id="login-error" class="error"></div>
     </div>
   </div>
 
-  <!-- Conteúdo do Monitor (após auth) -->
+  <!-- Header Principal -->
   <header class="header" hidden>
     <div class="logo">SuaVez</div>
     <div class="user" id="header-label"></div>
   </header>
 
+  <!-- Conteúdo Principal -->
   <main class="main" hidden>
+    <!-- Seção de QR Code -->
+    <section class="qrcode-panel">
+      <h2>QR Code para clientes</h2>
+      <div id="qrcode"></div>
+      <p>Aponte a câmera do celular para este QR para entrar na fila.</p>
+    </section>
+
+    <!-- Painel de Identificador -->
     <section class="id-panel">
       <label for="attendant-id">Identificador:</label>
       <input type="text" id="attendant-id" placeholder="Ex: Sala1 ou Sandes" />
     </section>
 
+    <!-- Painel de Chamada -->
     <section class="call-panel">
       <div class="display">
         Chamando: <span id="current-call">–</span>
@@ -63,6 +74,7 @@
       <button id="btn-reset" class="btn btn-warning">Resetar Tickets</button>
     </section>
 
+    <!-- Histórico de Cancelados -->
     <section class="history-panel">
       <h2>Cancelados</h2>
       <ul id="cancel-list" class="list"></ul>
