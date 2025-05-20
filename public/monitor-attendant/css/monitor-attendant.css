@@ -78,6 +78,10 @@ body {
   color: var(--danger);
   font-size: 0.875rem;
 }
+#onboard-overlay[hidden] {
+  display: none !important;
+}
+
 
 /* Login overlay (hidden by default) */
 #login-overlay {
@@ -262,3 +266,7 @@ body {
   font-size: 0.85rem;
   color: var(--muted);
 }
+#login-overlay[hidden] {
+  display: none !important;
+}
+
