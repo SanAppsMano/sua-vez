@@ -1,20 +1,24 @@
-// functions/cancelar.js
 import { Redis } from "@upstash/redis";
 
 export async function handler(event) {
+  const url      = new URL(event.rawUrl);
+  const tenantId = url.searchParams.get("t");
+  if (!tenantId) {
+    return { statusCode: 400, body: "Missing tenantId" };
+  }
+
   const { clientId } = JSON.parse(event.body || "{}");
-  const redis = Redis.fromEnv();
+  const redis  = Redis.fromEnv();
+  const prefix = `tenant:${tenantId}:`;
 
-  // Lê o número antes de remover
-  const ticketNum = await redis.get(`ticket:${clientId}`);
+  // Recupera e remove ticket do cliente
+  const ticketNum = await redis.get(prefix + `ticket:${clientId}`);
+  await redis.del(prefix + `ticket:${clientId}`);
 
-  // Remove o ticket
-  await redis.del(`ticket:${clientId}`);
-
-  // Registra no log de cancelamentos
+  // Log de cancelamento
   const ts = Date.now();
   await redis.lpush(
-    "cancelledList",
+    prefix + "log:cancelled",
     JSON.stringify({ ticket: Number(ticketNum), ts })
   );
 
