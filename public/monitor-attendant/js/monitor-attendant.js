@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderQRCode(tId) {
     const container = document.getElementById('qrcode');
     container.innerHTML = '';
-    const urlCliente = `${location.origin}/client/?t=${tId}`;
+    const urlCliente = location.origin + '/client/?t=' + tId;
     new QRCode(container, {
       text: urlCliente,
       width: 128,
@@ -75,14 +75,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/.netlify/functions/registerMonitor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: newTenant, label, password: pw })
+        body: JSON.stringify({ tenantId: newTenant, label: label, password: pw })
       });
       if (!res.ok) throw new Error('Registro falhou');
-      const { success } = await res.json();
-      if (!success) throw new Error('Registro inválido');
+      const data = await res.json();
+      if (!data.success) throw new Error('Registro inválido');
       localStorage.setItem('tenantId', newTenant);
       // Atualiza URL sem recarregar
-      history.replaceState(null, '', `/monitor-attendant/?t=${newTenant}`);
+      history.replaceState(null, '', '/monitor-attendant/?t=' + newTenant);
       showApp(label, newTenant);
     } catch (e) {
       console.error(e);
@@ -99,15 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     try {
       const t = tenantId;
-      const res = await fetch(`/.netlify/functions/validatePassword?t=${t}`, {
+      const res = await fetch('/.netlify/functions/validatePassword?t=' + t, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw })
       });
       const { valid, label } = await res.json();
       if (valid) {
-        // Atualiza URL sem recarregar
-        history.replaceState(null, '', `/monitor-attendant/?t=${t}`);
+        history.replaceState(null, '', '/monitor-attendant/?t=' + t);
         showApp(label, t);
       } else {
         loginError.textContent = 'Senha incorreta.';
@@ -119,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ■■■ Mostrar UI principal ■■■
-  async function showApp(label, tId) {
+  function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
     headerEl.hidden       = false;
@@ -137,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loginOverlay.hidden   = true;
     } else {
       onboardOverlay.hidden = true;
-      const res = await fetch(`/.netlify/functions/getTenantConfig?t=${tenantId}`);
+      const res = await fetch('/.netlify/functions/getTenantConfig?t=' + tenantId);
       if (res.ok) {
         loginOverlay.hidden = false;
       } else {
@@ -157,14 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnNext.onclick = async () => {
       const id = attendantInput.value.trim();
-      const url = `/.netlify/functions/chamar?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`;
+      let url = '/.netlify/functions/chamar?t=' + t;
+      if (id) url += '&id=' + encodeURIComponent(id);
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
 
     btnRepeat.onclick = async () => {
       const id = attendantInput.value.trim();
-      const url = `/.netlify/functions/chamar?t=${t}&num=${callCounter}${id?`&id=${encodeURIComponent(id)}`:''}`;
+      let url = '/.netlify/functions/chamar?t=' + t + '&num=' + callCounter;
+      if (id) url += '&id=' + encodeURIComponent(id);
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
@@ -173,7 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const num = Number(selectManual.value);
       if (!num) return alert('Selecione um ticket válido');
       const id = attendantInput.value.trim();
-      const url = `/.netlify/functions/chamar?t=${t}&num=${num}${id?`&id=${encodeURIComponent(id)}`':''}`;
+      let url = '/.netlify/functions/chamar?t=' + t + '&num=' + num;
+      if (id) url += '&id=' + encodeURIComponent(id);
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
@@ -181,7 +183,9 @@ document.addEventListener('DOMContentLoaded', () => {
     btnReset.onclick = async () => {
       if (!confirm('Confirma resetar todos os tickets para 1?')) return;
       const id = attendantInput.value.trim();
-      const res = await fetch(`/.netlify/functions/reset?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`, { method: 'POST' });
+      let url = '/.netlify/functions/reset?t=' + t;
+      if (id) url += '&id=' + encodeURIComponent(id);
+      const res = await fetch(url, { method: 'POST' });
       if (res.ok) updateCall(0, '');
     };
   }
@@ -196,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Busca status (chamados e tickets)
   async function fetchStatus(t) {
     try {
-      const res = await fetch(`/.netlify/functions/status?t=${t}`);
+      const res = await fetch('/.netlify/functions/status?t=' + t);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
       callCounter     = currentCall;
       ticketCounter   = tc;
@@ -224,16 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Busca lista de cancelados
   async function fetchCancelled(t) {
     try {
-      const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
+      const res = await fetch('/.netlify/functions/cancelados?t=' + t);
       const body = await res.json();
       const list = Array.isArray(body.cancelled) ? body.cancelled : [];
       cancelListEl.innerHTML = '';
       list.forEach(item => {
         const li = document.createElement('li');
-        li.innerHTML = `
-          <span>${item.ticket}</span>
-          <span class="ts">${fmtTime(item.ts)}</span>
-        `;
+        li.innerHTML = '<span>' + item.ticket + '</span>' +
+                       '<span class="ts">' + fmtTime(item.ts) + '</span>';
         cancelListEl.appendChild(li);
       });
     } catch (e) {
