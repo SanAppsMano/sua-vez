@@ -81,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const { success } = await res.json();
       if (!success) throw new Error('Registro inválido');
       localStorage.setItem('tenantId', newTenant);
+      // Atualiza URL sem recarregar
+      history.replaceState(null, '', `/monitor-attendant/?t=${newTenant}`);
       showApp(label, newTenant);
     } catch (e) {
       console.error(e);
@@ -104,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const { valid, label } = await res.json();
       if (valid) {
+        // Atualiza URL sem recarregar
+        history.replaceState(null, '', `/monitor-attendant/?t=${t}`);
         showApp(label, t);
       } else {
         loginError.textContent = 'Senha incorreta.';
@@ -122,7 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mainEl.hidden         = false;
     bodyEl.classList.add('authenticated');
     headerLabel.textContent = label;
-    localStorage.setItem('tenantId', tId);
     renderQRCode(tId);
     initApp(tId);
   }
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const num = Number(selectManual.value);
       if (!num) return alert('Selecione um ticket válido');
       const id = attendantInput.value.trim();
-      const url = `/.netlify/functions/chamar?t=${t}&num=${num}${id?`&id=${encodeURIComponent(id)}`:''}`;
+      const url = `/.netlify/functions/chamar?t=${t}&num=${num}${id?`&id=${encodeURIComponent(id)}`':''}`;
       const { called, attendant } = await (await fetch(url)).json();
       updateCall(called, attendant);
     };
