@@ -1,12 +1,21 @@
 // public/monitor-attendant/js/monitor-attendant.js
 
+/**
+ * Script multi-tenant para a tela do atendente:
+ * - Onboarding de tenant (empresa + senha)
+ * - Autenticação posterior
+ * - Renderização de QR Code para a fila do cliente
+ * - Dropdown manual com tickets disponíveis
+ * - Chamadas, repetição, reset, polling de cancelados e espera
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams    = new URL(location).searchParams;
   const tenantParam  = urlParams.get('t');
   const storedTenant = localStorage.getItem('tenantId');
   const tenantId     = tenantParam || storedTenant;
 
-  // Elementos de overlay e UI
+  // Overlays e seções
   const onboardOverlay = document.getElementById('onboard-overlay');
   const loginOverlay   = document.getElementById('login-overlay');
   const headerEl       = document.querySelector('.header');
@@ -40,6 +49,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let callCounter   = 0;
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
+
+  // Gera QR Code para o cliente
+  function renderQRCode(tId) {
+    const container = document.getElementById('qrcode');
+    container.innerHTML = '';
+    const urlCliente = `${location.origin}/client/?t=${tId}`;
+    new QRCode(container, {
+      text: urlCliente,
+      width: 128,
+      height: 128
+    });
+  }
 
   // ■■■ Onboarding ■■■
   onboardSubmit.onclick = async () => {
@@ -102,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bodyEl.classList.add('authenticated');
     headerLabel.textContent = label;
     localStorage.setItem('tenantId', tId);
+    renderQRCode(tId);
     initApp(tId);
   }
 
@@ -125,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ■■■ Lógica Principal ■■■
   function initApp(t) {
-    // Carrega status e cancelados
     fetchStatus(t);
     fetchCancelled(t);
     setInterval(() => fetchStatus(t), 5000);
@@ -157,10 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnReset.onclick = async () => {
       if (!confirm('Confirma resetar todos os tickets para 1?')) return;
       const id = attendantInput.value.trim();
-      await fetch(`/.netlify/functions/reset?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`, {
-        method: 'POST'
-      });
-      updateCall(0, '');
+      const res = await fetch(`/.netlify/functions/reset?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`, { method: 'POST' });
+      if (res.ok) updateCall(0, '');
     };
   }
 
@@ -176,8 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
-      callCounter   = currentCall;
-      ticketCounter = tc;
+      callCounter     = currentCall;
+      ticketCounter   = tc;
       currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
       currentIdEl.textContent   = attendant || '';
       waitingEl.textContent     = currentCall < tc ? tc - currentCall : 0;
