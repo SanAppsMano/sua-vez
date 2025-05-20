@@ -8,13 +8,11 @@
  * - Chamadas, repetição, reset, polling de cancelados e espera
  */
 
-import bcrypt from 'bcryptjs'; // se precisar no client
-
 document.addEventListener('DOMContentLoaded', () => {
-  const urlParams      = new URL(location).searchParams;
-  const tenantParam    = urlParams.get('t');
-  const storedTenant   = localStorage.getItem('tenantId');
-  const tenantId       = tenantParam || storedTenant;
+  const urlParams    = new URL(location).searchParams;
+  const tenantParam  = urlParams.get('t');
+  const storedTenant = localStorage.getItem('tenantId');
+  const tenantId     = tenantParam || storedTenant;
 
   // Elementos principais
   const onboardOverlay = document.getElementById('onboard-overlay');
@@ -67,7 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ tenantId: newTenant, label, password: pw })
       });
       if (!res.ok) throw new Error('Registro falhou');
-      // Guarda e exibe imediatamente o app
+      const { success } = await res.json();
+      if (!success) throw new Error('Registro inválido');
       localStorage.setItem('tenantId', newTenant);
       showApp(label, newTenant);
     } catch (e) {
@@ -111,8 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
     bodyEl.classList.add('authenticated');
     headerLabel.textContent = label;
     localStorage.setItem('tenantId', tId);
-
-    // Inicia lógica principal
     await initApp(tId);
   }
 
@@ -122,15 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
       onboardOverlay.hidden = false;
       loginOverlay.hidden   = true;
     } else {
-      // Já existe tenantId, validar se está registrado
       onboardOverlay.hidden = true;
       const res = await fetch(`/.netlify/functions/getTenantConfig?t=${tenantId}`);
       if (res.ok) {
         loginOverlay.hidden = false;
       } else {
-        // tenant inválido: limpa e volta ao onboarding
         localStorage.removeItem('tenantId');
-        location.search = '';
+        history.replaceState(null, '', '/monitor-attendant/');
         onboardOverlay.hidden = false;
       }
     }
@@ -176,32 +171,29 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Atualiza o display de chamada
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num;
-    currentIdEl.textContent = attendantId || '';
+    currentIdEl.textContent   = attendantId || '';
   }
 
-  // Pega status (chamados e tickets)
   async function fetchStatus(t) {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
-      callCounter = currentCall;
-      ticketCounter = tc;
+      callCounter     = currentCall;
+      ticketCounter   = tc;
       currentCallEl.textContent = currentCall;
-      currentIdEl.textContent = attendant || '';
-      waitingEl.textContent = Math.max(0, tc - currentCall);
+      currentIdEl.textContent   = attendant || '';
+      waitingEl.textContent     = Math.max(0, tc - currentCall);
       updateManualOptions();
     } catch (e) {
       console.error('Erro ao buscar status:', e);
     }
   }
 
-  // Preenche dropdown manual
   function updateManualOptions() {
-    selectManual.innerHTML = '<option value="">Selecione...</option>';
+    selectManual.innerHTML = '<option value=\"\">Selecione...</option>';
     for (let i = callCounter + 1; i <= ticketCounter; i++) {
       const opt = document.createElement('option');
       opt.value = i;
@@ -211,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
     selectManual.disabled = callCounter + 1 > ticketCounter;
   }
 
-  // Busca lista de cancelados
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
@@ -221,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const li = document.createElement('li');
         li.innerHTML = `
           <span>${item.ticket}</span>
-          <span class="ts">${fmtTime(item.ts)}</span>
+          <span class=\"ts\">${fmtTime(item.ts)}</span>
         `;
         cancelListEl.appendChild(li);
       });
