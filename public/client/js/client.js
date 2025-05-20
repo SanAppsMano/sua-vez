@@ -14,6 +14,17 @@ let polling, alertInterval;
 let lastEventTs = 0;
 let silenced   = false;
 
+// Captura o tenantId da URL
+const urlParams = new URL(location).searchParams;
+const tenantId  = urlParams.get("t");
+
+// Função auxiliar para montar a URL do function
+function fnUrl(fnName, method = "", body) {
+  let url = `/.netlify/functions/${fnName}?t=${tenantId}`;
+  if (method === "GET") return url;
+  return { url, opts: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } };
+}
+
 btnStart.addEventListener("click", () => {
   alertSound.play().then(() => alertSound.pause()).catch(()=>{});
   if (navigator.vibrate) navigator.vibrate(1);
@@ -25,7 +36,9 @@ btnStart.addEventListener("click", () => {
 });
 
 async function getTicket() {
-  const res = await fetch("/.netlify/functions/entrar");
+  // Chama /entrar?t=...
+  const { url, opts } = fnUrl("entrar", "POST");
+  const res = await fetch(url, opts);
   const data = await res.json();
   clientId      = data.clientId;
   ticketNumber  = data.ticketNumber;
@@ -35,7 +48,9 @@ async function getTicket() {
 
 async function checkStatus() {
   if (!ticketNumber) return;
-  const res = await fetch("/.netlify/functions/status");
+  // Chama /status?t=...
+  const { url } = fnUrl("status", "GET");
+  const res = await fetch(url);
   const { currentCall, timestamp, attendant } = await res.json();
 
   if (currentCall !== ticketNumber) {
@@ -81,11 +96,11 @@ btnCancel.addEventListener("click", async () => {
   btnCancel.disabled = true;
   statusEl.textContent = "Cancelando...";
   clearInterval(alertInterval);
-  await fetch("/.netlify/functions/cancelar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId })
-  });
+
+  // Chama /cancelar?t=...
+  const { url, opts } = fnUrl("cancelar", "POST", { clientId });
+  await fetch(url, opts);
+
   clearInterval(polling);
   statusEl.textContent = "Você saiu da fila.";
   ticketEl.textContent = "–";
