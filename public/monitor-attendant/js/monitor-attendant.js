@@ -1,20 +1,12 @@
 // public/monitor-attendant/js/monitor-attendant.js
 
-/**
- * Script multi-tenant para a tela do atendente:
- * - Onboarding de tenant (empresa + senha)
- * - Autenticação posterior
- * - Dropdown manual com tickets disponíveis
- * - Chamadas, repetição, reset, polling de cancelados e espera
- */
-
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams    = new URL(location).searchParams;
   const tenantParam  = urlParams.get('t');
   const storedTenant = localStorage.getItem('tenantId');
   const tenantId     = tenantParam || storedTenant;
 
-  // Overlays e seções
+  // Elementos de overlay e UI
   const onboardOverlay = document.getElementById('onboard-overlay');
   const loginOverlay   = document.getElementById('login-overlay');
   const headerEl       = document.querySelector('.header');
@@ -113,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp(tId);
   }
 
-  // Fluxo inicial: on-board vs login
+  // Fluxo inicial: onboarding vs login
   (async () => {
     if (!tenantId) {
       onboardOverlay.hidden = false;
@@ -133,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ■■■ Lógica Principal ■■■
   function initApp(t) {
-    // Carrega apenas status e cancelados, sem chamar
+    // Carrega status e cancelados
     fetchStatus(t);
     fetchCancelled(t);
     setInterval(() => fetchStatus(t), 5000);
@@ -165,17 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
     btnReset.onclick = async () => {
       if (!confirm('Confirma resetar todos os tickets para 1?')) return;
       const id = attendantInput.value.trim();
-      const res = await fetch(`/.netlify/functions/reset?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`, {
+      await fetch(`/.netlify/functions/reset?t=${t}${id?`&id=${encodeURIComponent(id)}`:''}`, {
         method: 'POST'
       });
-      if (res.ok) updateCall(0, '');
+      updateCall(0, '');
     };
   }
 
   // Atualiza chamada atual
   function updateCall(num, attendantId) {
     callCounter = num;
-    currentCallEl.textContent = num;
+    currentCallEl.textContent = num > 0 ? num : '–';
     currentIdEl.textContent   = attendantId || '';
   }
 
@@ -184,8 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
       const { currentCall, ticketCounter: tc, attendant } = await res.json();
-      callCounter     = currentCall;
-      ticketCounter   = tc;
+      callCounter   = currentCall;
+      ticketCounter = tc;
       currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
       currentIdEl.textContent   = attendant || '';
       waitingEl.textContent     = currentCall < tc ? tc - currentCall : 0;
@@ -211,9 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
-      const { cancelled } = await res.json();
+      const body = await res.json();
+      const list = Array.isArray(body.cancelled) ? body.cancelled : [];
       cancelListEl.innerHTML = '';
-      cancelled.forEach(item => {
+      list.forEach(item => {
         const li = document.createElement('li');
         li.innerHTML = `
           <span>${item.ticket}</span>
