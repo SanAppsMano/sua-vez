@@ -2,19 +2,22 @@
 
 /**
  * Script multi-tenant para a tela do atendente:
- * - Onboarding de tenant (empresa + senha)
- * - Autenticação posterior
+ * - Onboarding de tenant (empresa + senha) via Redis/Upstash
+ * - Autenticação posterior (senha protegida)
  * - Renderização de QR Code para a fila do cliente
  * - Dropdown manual com tickets disponíveis
  * - Chamadas, repetição, reset, polling de cancelados e espera
  * - Interação QR: expandir e copiar link
  */
 
+import { v4 as uuidv4 } from 'https://jspm.dev/uuid';
+
 document.addEventListener('DOMContentLoaded', () => {
-  const urlParams    = new URL(location).searchParams;
-  const tenantParam  = urlParams.get('t');
-  const storedTenant = localStorage.getItem('tenantId');
-  const tenantId     = tenantParam || storedTenant;
+  const urlParams     = new URL(location).searchParams;
+  let token           = urlParams.get('t');
+  let empresaParam    = urlParams.get('empresa');
+  const storedConfig  = localStorage.getItem('monitorConfig');
+  let cfg             = storedConfig ? JSON.parse(storedConfig) : null;
 
   // Overlays e seções
   const onboardOverlay = document.getElementById('onboard-overlay');
@@ -47,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnManual      = document.getElementById('btn-manual');
   const btnReset       = document.getElementById('btn-reset');
 
-  // QR Interaction
+  // QR Interaction setup
   const qrContainer    = document.getElementById('qrcode');
   const qrOverlay      = document.createElement('div');
   qrOverlay.id = 'qrcode-overlay';
@@ -70,13 +73,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
+  /** Renderiza o QR Code e configura interação */
   function renderQRCode(tId) {
     qrContainer.innerHTML = '';
     qrOverlayContent.innerHTML = '';
     const urlCliente = `${location.origin}/client/?t=${tId}`;
     new QRCode(qrContainer, { text: urlCliente, width: 128, height: 128 });
     new QRCode(qrOverlayContent, { text: urlCliente, width: 256, height: 256 });
-
     qrContainer.style.cursor = 'pointer';
     qrContainer.onclick = () => {
       navigator.clipboard.writeText(urlCliente).then(() => {
@@ -88,57 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // ■■■ Onboarding ■■■
-  onboardSubmit.onclick = async () => {
-    const label = onboardLabel.value.trim();
-    const pw    = onboardPassword.value;
-    if (!label || !pw) {
-      onboardError.textContent = 'Preencha nome e senha.';
-      return;
-    }
-    try {
-      const newTenant = tenantId || crypto.randomUUID().split('-')[0];
-      const res = await fetch(`/.netlify/functions/registerMonitor?t=${newTenant}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: newTenant, label, password: pw })
-      });
-      const { success } = await res.json();
-      if (!success) throw new Error('Registro inválido');
-      localStorage.setItem('tenantId', newTenant);
-      history.replaceState(null, '', `/monitor-attendant/?t=${newTenant}`);
-      showApp(label, newTenant);
-    } catch (e) {
-      console.error(e);
-      onboardError.textContent = 'Erro ao criar monitor.';
-    }
-  };
-
-  // ■■■ Login ■■■
-  loginSubmit.onclick = async () => {
-    const pw = loginPassword.value;
-    if (!pw) {
-      loginError.textContent = 'Digite a senha.';
-      return;
-    }
-    try {
-      const res = await fetch(`/.netlify/functions/validatePassword?t=${tenantId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw })
-      });
-      const { valid, label } = await res.json();
-      if (valid) {
-        history.replaceState(null, '', `/monitor-attendant/?t=${tenantId}`);
-        showApp(label, tenantId);
-      } else {
-        loginError.textContent = 'Senha incorreta.';
-      }
-    } catch (e) {
-      console.error(e);
-      loginError.textContent = 'Erro no login.';
-    }
-  };
-
-  async function showApp(label, tId) {
+  /** Exibe a interface principal após autenticação */
+  function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
     headerEl.hidden       = false;
@@ -149,22 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp(tId);
   }
 
-  (async () => {
-    if (!tenantId) {
-      onboardOverlay.hidden = false;
-      loginOverlay.hidden = true;
-    } else {
-      onboardOverlay.hidden = true;
-      const res = await fetch(`/.netlify/functions/getTenantConfig?t=${tenantId}`);
-      if (res.ok) loginOverlay.hidden = false;
-      else {
-        localStorage.removeItem('tenantId');
-        history.replaceState(null, '', '/monitor-attendant/');
-        onboardOverlay.hidden = false;
-      }
-    }
-  })();
-
+  /** Inicializa polling e botões principais */
   function initApp(t) {
     fetchStatus(t);
     fetchCancelled(t);
@@ -209,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchStatus(t) {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
-      const { currentCall, ticketCounter: tc, attendant } = await res.json();
+      const { currentCall, ticketCounter: tc } = await res.json();
       callCounter = currentCall;
       ticketCounter = tc;
       currentCallEl.textContent = currentCall > 0 ? currentCall : '–';
@@ -234,17 +173,84 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
-      const data = await res.json();
-      const list = Array.isArray(data.cancelled) ? data.cancelled : [];
+      const { cancelled = [] } = await res.json();
       cancelListEl.innerHTML = '';
-      list.forEach(({ ticket, ts }) => {
+      cancelled.forEach(({ ticket, ts }) => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${ticket}</span>` +
-                       `<span class=\"ts\">${fmtTime(ts)}</span>`;
+        li.innerHTML = `<span>${ticket}</span><span class="ts">${fmtTime(ts)}</span>`;
         cancelListEl.appendChild(li);
       });
     } catch (e) {
       console.error('Erro ao buscar cancelados:', e);
     }
   }
+
+  // ■■■ Fluxo de Autenticação / Trial ■■■
+  (async () => {
+    // 1) Se já temos cfg em localStorage, pular direto
+    if (cfg && cfg.empresa && cfg.senha) {
+      showApp(cfg.empresa, token || '');
+      return;
+    }
+
+    // 2) Se vier ?t e ?empresa na URL, pede só senha
+    if (token && empresaParam) {
+      loginOverlay.hidden = true;
+      onboardOverlay.hidden = true;
+      try {
+        const senhaPrompt = prompt(`Digite a senha de acesso para a empresa ${empresaParam}:`);
+        const res = await fetch('/.netlify/functions/getMonitorConfig', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, senha: senhaPrompt })
+        });
+        if (!res.ok) throw new Error();
+        const { empresa } = await res.json();
+        cfg = { empresa, senha: senhaPrompt };
+        localStorage.setItem('monitorConfig', JSON.stringify(cfg));
+        // limpar URL e manter empresa
+        history.replaceState(null, '', `/monitor-attendant/?empresa=${encodeURIComponent(empresaParam)}`);
+        showApp(empresa, token);
+        return;
+      } catch {
+        alert('Token ou senha inválidos.');
+        history.replaceState(null, '', '/monitor-attendant/');
+      }
+    }
+
+    // 3) Senão, exibir onboarding para trial
+    onboardOverlay.hidden = false;
+    loginOverlay.hidden = true;
+
+    onboardSubmit.onclick = async () => {
+      const label = onboardLabel.value.trim();
+      const pw    = onboardPassword.value;
+      if (!label || !pw) {
+        onboardError.textContent = 'Preencha nome e senha.';
+        return;
+      }
+      onboardError.textContent = '';
+      try {
+        token = crypto.randomUUID().split('-')[0];
+        const trialDays = 7;
+        const res = await fetch('/.netlify/functions/saveMonitorConfig', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, empresa: label, senha: pw, trialDays })
+        });
+        const { ok } = await res.json();
+        if (!ok) throw new Error();
+        cfg = { empresa: label, senha: pw };
+        localStorage.setItem('monitorConfig', JSON.stringify(cfg));
+        history.replaceState(
+          null, '', 
+          `/monitor-attendant/?t=${token}&empresa=${encodeURIComponent(label)}`
+        );
+        showApp(label, token);
+      } catch (e) {
+        console.error(e);
+        onboardError.textContent = 'Erro ao criar monitor.';
+      }
+    };
+  })();
 });
