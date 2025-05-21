@@ -113,25 +113,19 @@ button {
   border-radius: var(--radius);
 }
 
-/* Header com nome da empresa */
+/* Client header (empresa) */
 .client-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 360px;
-  margin: 0 auto 1rem;
+  text-align: center;
+  margin-bottom: 1rem;
 }
-
-.client-header .logo {
-  color: var(--primary);
+.logo {
   font-size: 1.5rem;
   font-weight: bold;
+  color: var(--primary);
 }
-
 .company-name {
-  font-size: 1rem;
-  color: var(--text);
+  font-size: 1.25rem;
+  color: var(--primary);
+  margin: 0.25rem 0 1rem;
   font-weight: 500;
-  margin: 0;
 }
