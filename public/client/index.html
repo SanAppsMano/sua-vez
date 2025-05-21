@@ -7,23 +7,34 @@
   <link rel="stylesheet" href="css/client.css"/>
 </head>
 <body>
-  <header class="client-header">
-    <div class="logo">SuaVez</div>
-    <h1 id="client-company" class="company-name">Carregando...</h1>
-  </header>
-
-  <div class="container">
-    <p>Seu número:</p>
-    <div id="ticket" class="ticket">–</div>
-    <div id="status" class="status">Aguardando chamada...</div>
-    <button id="btn-cancel" class="btn-cancel" disabled>Desistir da fila</button>
-    <button id="btn-silence" class="btn-silence" hidden>Silenciar alerta</button>
-    <audio id="alert-sound" preload="auto" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-  </div>
-
   <!-- Overlay inicial para destravar áudio/vibração/notificações -->
   <div id="overlay">
     <button id="btn-start">Toque para ativar alertas</button>
+  </div>
+
+  <div class="client-wrapper hidden">
+    <header class="client-header">
+      <div class="logo">SuaVez</div>
+      <h1 id="client-company" class="company-name">Carregando...</h1>
+    </header>
+
+    <main class="container">
+      <section class="ticket-section">
+        <p class="label">Seu número</p>
+        <div id="ticket" class="ticket">–</div>
+      </section>
+
+      <section class="status-section">
+        <p id="status" class="status">Aguardando chamada...</p>
+      </section>
+
+      <section class="actions">
+        <button id="btn-cancel" class="btn btn-cancel" disabled>Desistir da fila</button>
+        <button id="btn-silence" class="btn btn-silence hidden">Silenciar alerta</button>
+      </section>
+
+      <audio id="alert-sound" preload="auto" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+    </main>
   </div>
 
   <script src="js/client.js"></script>
