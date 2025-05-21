@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const senhaPrompt = prompt(`Digite a senha de acesso para a empresa ${empresaParam}:`);
         const res = await fetch(`${location.origin}/.netlify/functions/getMonitorConfig`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ token, senha: senhaPrompt })
         });
         if (!res.ok) throw new Error();
@@ -253,18 +253,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const trialDays = 7;
         const res = await fetch(`${location.origin}/.netlify/functions/saveMonitorConfig`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ token, empresa: label, senha: pw, trialDays })
         });
         const { ok } = await res.json();
         if (!ok) throw new Error();
         cfg = { token, empresa: label, senha: pw };
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
-        history.replaceState(
-          null,
-          '',
-          `/monitor-attendant/?t=${token}&empresa=${encodeURIComponent(label)}`
-        );
+        history.replaceState(null, '', `/monitor-attendant/?t=${token}&empresa=${encodeURIComponent(label)}`);
         showApp(label, token);
       } catch (e) {
         console.error(e);
