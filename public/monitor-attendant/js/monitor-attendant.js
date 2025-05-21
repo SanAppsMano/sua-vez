@@ -4,9 +4,10 @@
  * Script multi-tenant para a tela do atendente:
  * - Onboarding de tenant (empresa + senha) via Redis/Upstash
  * - Autenticação posterior (senha protegida)
+ * - Reset de configuração (empresa+senha) no Redis e local
  * - Renderização de QR Code para a fila do cliente
  * - Dropdown manual com tickets disponíveis
- * - Chamadas, repetição, reset, polling de cancelados e espera
+ * - Chamadas, repetição, reset de tickets, polling de cancelados
  * - Interação QR: expandir e copiar link
  */
 
@@ -30,7 +31,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const onboardSubmit   = document.getElementById('onboard-submit');
   const onboardError    = document.getElementById('onboard-error');
 
-  // UI principal
+  // Botão Redefinir Cadastro
+  const btnDeleteConfig = document.getElementById('btn-delete-config');
+  btnDeleteConfig.onclick = async () => {
+    if (!token) {
+      alert('Nenhum monitor ativo para resetar.');
+      return;
+    }
+    if (!confirm('Deseja realmente apagar empresa e senha do servidor?')) return;
+    try {
+      const res = await fetch('/.netlify/functions/deleteMonitorConfig', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        localStorage.removeItem('monitorConfig');
+        history.replaceState(null, '', '/monitor-attendant/');
+        location.reload();
+      } else {
+        alert('Erro ao resetar no servidor: ' + (data.error || 'desconhecido'));
+      }
+    } catch (e) {
+      console.error('Falha ao chamar deleteMonitorConfig:', e);
+      alert('Erro de conexão ao servidor.');
+    }
+  };
+
+  // Elementos de UI principal
   const headerLabel    = document.getElementById('header-label');
   const attendantInput = document.getElementById('attendant-id');
   const currentCallEl  = document.getElementById('current-call');
@@ -66,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
-  /** Renderiza o QR Code e configura interação */
+  // Funções internas completas
   function renderQRCode(tId) {
     qrContainer.innerHTML = '';
     qrOverlayContent.innerHTML = '';
@@ -74,17 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
     new QRCode(qrContainer, { text: urlCliente, width: 128, height: 128 });
     new QRCode(qrOverlayContent, { text: urlCliente, width: 256, height: 256 });
     qrContainer.style.cursor = 'pointer';
-    qrContainer.onclick = () => {
-      navigator.clipboard.writeText(urlCliente).then(() => {
-        qrOverlay.style.display = 'flex';
-      });
-    };
-    qrOverlay.onclick = (e) => {
-      if (e.target === qrOverlay) qrOverlay.style.display = 'none';
-    };
+    qrContainer.onclick = () => navigator.clipboard.writeText(urlCliente).then(() => qrOverlay.style.display = 'flex');
+    qrOverlay.onclick = e => { if (e.target === qrOverlay) qrOverlay.style.display = 'none'; };
   }
 
-  /** Exibe a interface principal após autenticação */
   function showApp(label, tId) {
     onboardOverlay.hidden = true;
     loginOverlay.hidden   = true;
@@ -96,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp(tId);
   }
 
-  /** Inicializa polling e botões principais */
   function initApp(t) {
     fetchStatus(t);
     fetchCancelled(t);
@@ -154,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateManualOptions() {
     selectManual.innerHTML = '<option value="">Selecione...</option>';
-    for (let i = callCounter + 1; i <= ticketCounter; i++) {
+    for (let i = callCounter + 1; i <= ticketCounter; i++) {   
       const opt = document.createElement('option');
       opt.value = i;
       opt.textContent = i;
@@ -199,9 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!res.ok) throw new Error();
         const { empresa } = await res.json();
-        cfg = { empresa, senha: senhaPrompt };
+        cfg = { empresa, senha: senhaPrompt };        
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
-        // manter apenas empresa na URL
         history.replaceState(null, '', `/monitor-attendant/?empresa=${encodeURIComponent(empresaParam)}`);
         showApp(empresa, token);
         return;
