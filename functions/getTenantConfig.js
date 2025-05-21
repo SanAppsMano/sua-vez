@@ -1,42 +1,39 @@
 // functions/getTenantConfig.js
-const { Redis } = require('@upstash/redis');
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
+const faunadb = require('faunadb')  // exemplo de banco; mantenha o que você já usa
+const q = faunadb.query
+const client = new faunadb.Client({ secret: process.env.FAUNA_SECRET })
 
 exports.handler = async (event) => {
-  // 1) Recupera token via query string
-  const token = event.queryStringParameters?.t;
-  if (!token) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: 'Token ausente' })
-    };
-  }
-
   try {
-    // 2) Busca dados do monitor
-    const data = await redis.get(`monitor:${token}`);
-    if (!data) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ error: 'Monitor não encontrado' })
-      };
+    const token = event.queryStringParameters.t
+    // --- seu código existente para buscar o tenant ---
+    const result = await client.query(
+      q.Get(q.Match(q.Index('tenant_by_token'), token))
+    )
+    const tenant = result.data
+
+    // Monta o JSON de configuração, agora com companyName
+    const config = {
+      // campos existentes
+      name:           tenant.name,
+      slug:           tenant.slug,
+      themeColor:     tenant.themeColor,
+      // ------------- NOVO CAMPO -------------
+      companyName:    tenant.companyName || tenant.name,
+      // ... quaisquer outros campos que você já retornava
     }
 
-    // 3) Extrai e devolve só o nome da empresa
-    const { empresa } = JSON.parse(data);
     return {
       statusCode: 200,
-      body: JSON.stringify({ empresa })
-    };
+      body: JSON.stringify(config),
+      headers: { 'Content-Type': 'application/json' }
+    }
   } catch (err) {
-    console.error('Erro getTenantConfig:', err);
+    console.error('Erro em getTenantConfig:', err)
     return {
-      statusCode: 500,
+      statusCode: err.status || 500,
       body: JSON.stringify({ error: err.message })
-    };
+    }
   }
-};
+}
