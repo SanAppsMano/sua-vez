@@ -6,33 +6,33 @@
   <title>SuaVez Cliente</title>
   <link rel="stylesheet" href="css/client.css"/>
   <style>
-    /* Pequenas adições para o nome da empresa */
+    /* Header com nome da empresa */
     .client-header {
       text-align: center;
       margin-bottom: 1rem;
     }
     .company-name {
       font-size: 1.25rem;
-      color: #005f8c;
+      color: var(--primary);
       margin: 0.25rem 0 1rem;
       font-weight: 500;
     }
   </style>
 </head>
 <body>
-  <!-- Overlay inicial para destravar áudio/vibração/notificações -->
+  <!-- Overlay para autorizar áudio/notificações -->
   <div id="overlay">
     <button id="btn-start">Toque para ativar alertas</button>
   </div>
 
+  <!-- Conteúdo principal inicialmente oculto -->
   <div class="container hidden">
-    <!-- Cabeçalho com nome da empresa -->
+    <!-- Cabeçalho com logo e nome da empresa -->
     <div class="client-header">
       <div class="logo">SuaVez</div>
       <div id="company" class="company-name">—</div>
     </div>
 
-    <!-- Conteúdo principal já existente -->
     <h1>SuaVez</h1>
     <p>Seu número:</p>
     <div id="ticket" class="ticket">–</div>
@@ -48,31 +48,72 @@
       const overlay   = document.getElementById('overlay');
       const container = document.querySelector('.container');
       const companyEl = document.getElementById('company');
+      const ticketEl  = document.getElementById('ticket');
+      const statusEl  = document.getElementById('status');
+      const btnCancel = document.getElementById('btn-cancel');
+      const btnSilence= document.getElementById('btn-silence');
+      const alertSound= document.getElementById('alert-sound');
       const urlParams = new URL(location).searchParams;
       const token     = urlParams.get('t');
 
+      // 1) Ao clicar libera UI e busca nome da empresa
       document.getElementById('btn-start').onclick = async () => {
         overlay.hidden = true;
         container.classList.remove('hidden');
 
-        // Busca o nome da empresa
+        // Busca nome da empresa
         try {
-          const res = await fetch('/.netlify/functions/getMonitorConfig', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ token, senha: '' })
-          });
-          if (res.ok) {
-            const { empresa } = await res.json();
-            companyEl.textContent = empresa;
-          } else {
-            companyEl.textContent = '—';
-          }
+          const res = await fetch(`/.netlify/functions/getTenantConfig?t=${token}`);
+          if (!res.ok) throw new Error();
+          const { empresa } = await res.json();
+          companyEl.textContent = empresa;
         } catch {
           companyEl.textContent = '—';
         }
 
-        // Aqui você mantém todo o seu JS original de polling, blink, alertas, etc.
+        // Inicia polling
+        startPolling();
+      };
+
+      // 2) Polling de status a cada 5s
+      async function startPolling() {
+        try {
+          const res = await fetch(`/.netlify/functions/status?t=${token}`);
+          if (!res.ok) throw new Error();
+          const { currentCall } = await res.json();
+
+          if (currentCall > 0) {
+            ticketEl.textContent = currentCall;
+            statusEl.textContent = 'É sua vez!';
+            statusEl.classList.add('blink');
+            alertSound.play();
+            btnSilence.hidden = false;
+          }
+        } catch (e) {
+          console.error('Polling error:', e);
+        } finally {
+          setTimeout(startPolling, 5000);
+        }
+      }
+
+      // 3) Silenciar alerta
+      btnSilence.onclick = () => {
+        statusEl.classList.remove('blink');
+        alertSound.pause();
+        alertSound.currentTime = 0;
+        btnSilence.hidden = true;
+      };
+
+      // 4) Desistir da fila
+      btnCancel.onclick = async () => {
+        try {
+          await fetch(`/.netlify/functions/cancelar?t=${token}`, { method: 'POST' });
+          ticketEl.textContent = '–';
+          statusEl.textContent = 'Você saiu da fila';
+          btnCancel.disabled = true;
+        } catch (e) {
+          console.error('Erro cancelar:', e);
+        }
       };
     });
   </script>
