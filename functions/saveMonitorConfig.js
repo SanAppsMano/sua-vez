@@ -1,13 +1,12 @@
-import { Redis } from '@upstash/redis';
+// functions/saveMonitorConfig.js
+const { Redis } = require('@upstash/redis');
 
-// Inicialize o cliente Redis usando variáveis de ambiente definidas no Netlify
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env_UPSTASH_REDIS_REST_TOKEN
+  token: process.env.UPSTASH_REDIS_REST_TOKEN
 });
 
-export async function handler(event) {
-  // Só aceita POST
+exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Método não permitido' }) };
   }
@@ -24,17 +23,23 @@ export async function handler(event) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Dados incompletos' }) };
   }
 
-  // Tempo de trial (em segundos). Se não vier trialDays, assume 7 dias.
   const ttl = (trialDays ?? 7) * 24 * 60 * 60;
 
-  await redis.set(
-    `monitor:${token}`,
-    JSON.stringify({ empresa, senha }),
-    { ex: ttl }
-  );
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ ok: true, expiresIn: ttl })
-  };
-}
+  try {
+    await redis.set(
+      `monitor:${token}`,
+      JSON.stringify({ empresa, senha }),
+      { ex: ttl }
+    );
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, expiresIn: ttl })
+    };
+  } catch (err) {
+    console.error('Redis error:', err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message })
+    };
+  }
+};
