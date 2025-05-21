@@ -3,10 +3,16 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SuaVez Cliente</title>
+  <title>SuaVez</title>
   <link rel="stylesheet" href="css/client.css"/>
 </head>
 <body>
+  <!-- Cabeçalho com nome da empresa -->
+  <header class="client-header">
+    <div class="logo">SuaVez</div>
+    <h1 id="client-company" class="company-name">—</h1>
+  </header>
+
   <div class="container">
     <h1>SuaVez</h1>
     <p>Seu número:</p>
@@ -22,6 +28,35 @@
     <button id="btn-start">Toque para ativar alertas</button>
   </div>
 
-  <script src="js/client.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btnStart    = document.getElementById('btn-start');
+      const overlay     = document.getElementById('overlay');
+      const wrapper     = document.querySelector('.container');
+      const companyEl   = document.getElementById('client-company');
+      const urlParams   = new URL(location).searchParams;
+      const token       = urlParams.get('t');
+
+      btnStart.onclick = () => {
+        overlay.hidden = true;
+        wrapper.hidden = false;
+        fetchCompany();
+      };
+
+      async function fetchCompany() {
+        try {
+          const res = await fetch('/.netlify/functions/getMonitorConfig', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ token, senha: '' })
+          });
+          const { empresa } = await res.json();
+          companyEl.textContent = empresa;
+        } catch {
+          companyEl.textContent = '—';
+        }
+      }
+
+      // restante do seu js original (polling, botões etc.)
+    });
+  </script>
 </body>
-</html>
