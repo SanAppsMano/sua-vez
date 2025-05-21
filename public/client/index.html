@@ -55,10 +55,14 @@
 
       // Exibe nome da empresa (usa endpoint sem senha)
       try {
-        const res = await fetch(`/.netlify/functions/getTenantConfig?t=${token}`);
+        const res = await fetch(`/.netlify/functions/getMonitorConfig`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, senha: '' })
+        });
         if (!res.ok) throw new Error();
-        const { label } = await res.json();
-        companyEl.textContent = label;
+        const { empresa } = await res.json();
+        companyEl.textContent = empresa;
       } catch {
         companyEl.textContent = '—';
       }
