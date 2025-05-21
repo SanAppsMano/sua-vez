@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${location.origin}/.netlify/functions/deleteMonitorConfig`, {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
       });
       const data = await res.json();
