@@ -3,60 +3,117 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SuaVez</title>
+  <title>SuaVez Cliente</title>
   <link rel="stylesheet" href="css/client.css"/>
 </head>
 <body>
-  <!-- Cabeçalho com nome da empresa -->
-  <header class="client-header">
-    <div class="logo">SuaVez</div>
-    <h1 id="client-company" class="company-name">—</h1>
-  </header>
-
-  <div class="container">
-    <h1>SuaVez</h1>
-    <p>Seu número:</p>
-    <div id="ticket" class="ticket">–</div>
-    <div id="status" class="status">Aguardando chamada...</div>
-    <button id="btn-cancel" class="btn-cancel" disabled>Desistir da fila</button>
-    <button id="btn-silence" class="btn-silence" hidden>Silenciar alerta</button>
-    <audio id="alert-sound" preload="auto" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-  </div>
-
-  <!-- Overlay inicial para destravar áudio/vibração/notificações -->
+  <!-- Overlay para destravar som e notificações -->
   <div id="overlay">
     <button id="btn-start">Toque para ativar alertas</button>
   </div>
 
+  <!-- Conteúdo principal -->
+  <div class="client-wrapper hidden">
+    <header class="client-header">
+      <div class="logo">SuaVez</div>
+      <h1 id="client-company" class="company-name">—</h1>
+    </header>
+
+    <main class="container">
+      <section class="ticket-section">
+        <p class="label">Seu número</p>
+        <div id="ticket" class="ticket">–</div>
+      </section>
+
+      <section class="status-section">
+        <p id="status" class="status">Aguardando chamada...</p>
+      </section>
+
+      <section class="actions">
+        <button id="btn-cancel" class="btn-cancel" disabled>Desistir da fila</button>
+        <button id="btn-silence" class="btn-silence hidden">Silenciar alerta</button>
+      </section>
+
+      <audio id="alert-sound" preload="auto"
+             src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+    </main>
+  </div>
+
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const btnStart    = document.getElementById('btn-start');
-      const overlay     = document.getElementById('overlay');
-      const wrapper     = document.querySelector('.container');
-      const companyEl   = document.getElementById('client-company');
-      const urlParams   = new URL(location).searchParams;
-      const token       = urlParams.get('t');
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlay      = document.getElementById('overlay');
+    const wrapper      = document.querySelector('.client-wrapper');
+    const companyEl    = document.getElementById('client-company');
+    const ticketEl     = document.getElementById('ticket');
+    const statusEl     = document.getElementById('status');
+    const btnCancel    = document.getElementById('btn-cancel');
+    const btnSilence   = document.getElementById('btn-silence');
+    const alertSound   = document.getElementById('alert-sound');
+    const urlParams    = new URL(location).searchParams;
+    const token        = urlParams.get('t');
 
-      btnStart.onclick = () => {
-        overlay.hidden = true;
-        wrapper.hidden = false;
-        fetchCompany();
-      };
+    // 1) Desbloquear som e UI
+    document.getElementById('btn-start').onclick = () => {
+      overlay.hidden = true;
+      wrapper.classList.remove('hidden');
+      fetchCompany();
+      startPolling();
+    };
 
-      async function fetchCompany() {
-        try {
-          const res = await fetch('/.netlify/functions/getMonitorConfig', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ token, senha: '' })
-          });
-          const { empresa } = await res.json();
-          companyEl.textContent = empresa;
-        } catch {
-          companyEl.textContent = '—';
-        }
+    // 2) Busca nome da empresa
+    async function fetchCompany() {
+      try {
+        const res = await fetch(`/.netlify/functions/getTenantConfig?t=${token}`);
+        if (!res.ok) throw new Error();
+        const { empresa } = await res.json();
+        companyEl.textContent = empresa;
+      } catch {
+        companyEl.textContent = '—';
       }
+    }
 
-      // restante do seu js original (polling, botões etc.)
-    });
+    // 3) Polling de status da fila
+    async function startPolling() {
+      try {
+        const res = await fetch(`/.netlify/functions/status?t=${token}`);
+        if (!res.ok) throw new Error();
+        const { currentCall } = await res.json();
+
+        // Atualiza número
+        if (currentCall > 0) {
+          ticketEl.textContent = currentCall;
+          statusEl.textContent = 'É sua vez!';
+          statusEl.classList.add('blink');
+          alertSound.play();
+          btnSilence.classList.remove('hidden');
+        }
+      } catch (e) {
+        console.error('Erro no polling:', e);
+      } finally {
+        setTimeout(startPolling, 5000);
+      }
+    }
+
+    // 4) Silenciar alerta
+    btnSilence.onclick = () => {
+      statusEl.classList.remove('blink');
+      alertSound.pause();
+      alertSound.currentTime = 0;
+      btnSilence.classList.add('hidden');
+    };
+
+    // 5) Desistir da fila
+    btnCancel.onclick = async () => {
+      try {
+        await fetch(`/.netlify/functions/cancelar?t=${token}`, { method: 'POST' });
+        ticketEl.textContent = '–';
+        statusEl.textContent = 'Você saiu da fila';
+        btnCancel.disabled = true;
+      } catch (e) {
+        console.error('Erro ao cancelar:', e);
+      }
+    };
+  });
   </script>
 </body>
+</html>
