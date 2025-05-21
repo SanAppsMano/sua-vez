@@ -38,41 +38,70 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-      const overlay    = document.getElementById('overlay');
-      const wrapper    = document.querySelector('.client-wrapper');
-      const companyEl  = document.getElementById('client-company');
-      const urlParams  = new URL(location).searchParams;
-      const token      = urlParams.get('t');
-      const ticketEl   = document.getElementById('ticket');
-      const statusEl   = document.getElementById('status');
-      const alertSound = document.getElementById('alert-sound');
-      
-      // Ativar som e notificações
-      document.getElementById('btn-start').onclick = () => {
-        overlay.classList.add('hidden');
-        wrapper.classList.remove('hidden');
-      };
+  document.addEventListener('DOMContentLoaded', () => {
+    const overlay    = document.getElementById('overlay');
+    const wrapper    = document.querySelector('.client-wrapper');
+    const companyEl  = document.getElementById('client-company');
+    const urlParams  = new URL(location).searchParams;
+    const token      = urlParams.get('t');
+    const ticketEl   = document.getElementById('ticket');
+    const statusEl   = document.getElementById('status');
+    const alertSound = document.getElementById('alert-sound');
 
-      // Buscar empresa
+    // Quando usuário clica para ativar alertas
+    document.getElementById('btn-start').onclick = async () => {
+      overlay.classList.add('hidden');
+      wrapper.classList.remove('hidden');
+
+      // Exibe nome da empresa (usa endpoint sem senha)
       try {
-        const res = await fetch('/.netlify/functions/getMonitorConfig', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ token, senha: '' })
-        });
-        const { empresa } = await res.json();
-        companyEl.textContent = empresa;
+        const res = await fetch(`/.netlify/functions/getTenantConfig?t=${token}`);
+        if (!res.ok) throw new Error();
+        const { label } = await res.json();
+        companyEl.textContent = label;
       } catch {
-        companyEl.textContent = '';
+        companyEl.textContent = '—';
       }
 
-      // TODO: inicializar lógica de fila: polling, update ticket/status, tocar som, blink class
-      // Exemplo de chamada de demo:
-      // ticketEl.textContent = 'A01';
-      // statusEl.textContent = 'É sua vez!';
-      // alertSound.play();
-      // statusEl.classList.add('blink');
-    });
-  </script>
+      // Inicia polling da fila e alertas
+      pollStatus();
+    };
+
+    // Função de polling que atualiza ticket e status e dispara alerta
+    async function pollStatus() {
+      try {
+        const res = await fetch(`/.netlify/functions/status?t=${token}`);
+        const { currentCall } = await res.json();
+        // atualiza ticket/status
+        ticketEl.textContent = currentCall > 0 ? currentCall : ticketEl.textContent;
+        if (currentCall > 0) {
+          statusEl.textContent = 'É sua vez!';
+          statusEl.classList.add('blink');
+          alertSound.play();
+          document.getElementById('btn-silence').classList.remove('hidden');
+        }
+      } catch (e) {
+        console.error('Erro no polling:', e);
+      } finally {
+        setTimeout(pollStatus, 5000);
+      }
+    }
+
+    // Botão silenciar alerta
+    document.getElementById('btn-silence').onclick = () => {
+      statusEl.classList.remove('blink');
+      alertSound.pause();
+      alertSound.currentTime = 0;
+      document.getElementById('btn-silence').classList.add('hidden');
+    };
+
+    // Ações de desistir
+    document.getElementById('btn-cancel').onclick = async () => {
+      await fetch(`/.netlify/functions/cancelar?t=${token}`, { method: 'POST' });
+      ticketEl.textContent = '–';
+      statusEl.textContent = 'Você saiu da fila';
+    };
+  });
+</script>
 </body>
 </html>
