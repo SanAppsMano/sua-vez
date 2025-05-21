@@ -18,6 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const storedConfig  = localStorage.getItem('monitorConfig');
   let cfg             = storedConfig ? JSON.parse(storedConfig) : null;
 
+  // Se token não veio na URL mas existe em localStorage, usar
+  if (!token && cfg && cfg.token) {
+    token = cfg.token;
+  }
+
   // Overlays e seções
   const onboardOverlay = document.getElementById('onboard-overlay');
   const loginOverlay   = document.getElementById('login-overlay');
@@ -40,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!confirm('Deseja realmente apagar empresa e senha do servidor?')) return;
     try {
-      const res = await fetch('/.netlify/functions/deleteMonitorConfig', {
+      const res = await fetch(`${location.origin}/.netlify/functions/deleteMonitorConfig`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ token })
       });
       const data = await res.json();
@@ -54,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Erro ao resetar no servidor: ' + (data.error || 'desconhecido'));
       }
     } catch (e) {
-      console.error('Falha ao chamar deleteMonitorConfig:', e);
+      console.error('deleteMonitorConfig falhou:', e);
       alert('Erro de conexão ao servidor.');
     }
   };
@@ -95,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let ticketCounter = 0;
   const fmtTime     = ts => new Date(ts).toLocaleTimeString();
 
-  // Funções internas completas
+  /** Renderiza o QR Code e configura interação */
   function renderQRCode(tId) {
     qrContainer.innerHTML = '';
     qrOverlayContent.innerHTML = '';
@@ -107,58 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
     qrOverlay.onclick = e => { if (e.target === qrOverlay) qrOverlay.style.display = 'none'; };
   }
 
-  function showApp(label, tId) {
-    onboardOverlay.hidden = true;
-    loginOverlay.hidden   = true;
-    headerEl.hidden       = false;
-    mainEl.hidden         = false;
-    bodyEl.classList.add('authenticated');
-    headerLabel.textContent = label;
-    renderQRCode(tId);
-    initApp(tId);
-  }
-
-  function initApp(t) {
-    fetchStatus(t);
-    fetchCancelled(t);
-    setInterval(() => fetchStatus(t), 5000);
-    setInterval(() => fetchCancelled(t), 5000);
-
-    btnNext.onclick = async () => {
-      const id = attendantInput.value.trim();
-      let url = `/.netlify/functions/chamar?t=${t}`;
-      if (id) url += `&id=${encodeURIComponent(id)}`;
-      const { called, attendant } = await (await fetch(url)).json();
-      updateCall(called, attendant);
-    };
-
-    btnRepeat.onclick = async () => {
-      let url = `/.netlify/functions/chamar?t=${t}&num=${callCounter}`;
-      const { called, attendant } = await (await fetch(url)).json();
-      updateCall(called, attendant);
-    };
-
-    btnManual.onclick = async () => {
-      const num = Number(selectManual.value);
-      if (!num) return;
-      const url = `/.netlify/functions/chamar?t=${t}&num=${num}`;
-      const { called, attendant } = await (await fetch(url)).json();
-      updateCall(called, attendant);
-    };
-
-    btnReset.onclick = async () => {
-      if (!confirm('Confirma resetar todos os tickets para 1?')) return;
-      await fetch(`/.netlify/functions/reset?t=${t}`, { method: 'POST' });
-      updateCall(0, '');
-    };
-  }
-
+  /** Atualiza chamada */
   function updateCall(num, attendantId) {
     callCounter = num;
     currentCallEl.textContent = num > 0 ? num : '–';
     currentIdEl.textContent   = attendantId || '';
   }
 
+  /** Busca status e atualiza UI */
   async function fetchStatus(t) {
     try {
       const res = await fetch(`/.netlify/functions/status?t=${t}`);
@@ -173,9 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /** Atualiza opções manuais */
   function updateManualOptions() {
     selectManual.innerHTML = '<option value="">Selecione...</option>';
-    for (let i = callCounter + 1; i <= ticketCounter; i++) {   
+    for (let i = callCounter + 1; i <= ticketCounter; i++) {
       const opt = document.createElement('option');
       opt.value = i;
       opt.textContent = i;
@@ -184,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectManual.disabled = callCounter + 1 > ticketCounter;
   }
 
+  /** Busca cancelados e popula lista */
   async function fetchCancelled(t) {
     try {
       const res = await fetch(`/.netlify/functions/cancelados?t=${t}`);
@@ -199,11 +162,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /** Inicializa botões e polling */
+  function initApp(t) {
+    btnNext.onclick = async () => {
+      const id = attendantInput.value.trim();
+      let url = `/.netlify/functions/chamar?t=${t}`;
+      if (id) url += `&id=${encodeURIComponent(id)}`;
+      const { called, attendant } = await (await fetch(url)).json();
+      updateCall(called, attendant);
+    };
+    btnRepeat.onclick = async () => {
+      const { called, attendant } = await (await fetch(`/.netlify/functions/chamar?t=${t}&num=${callCounter}`)).json();
+      updateCall(called, attendant);
+    };
+    btnManual.onclick = async () => {
+      const num = Number(selectManual.value);
+      if (!num) return;
+      const { called, attendant } = await (await fetch(`/.netlify/functions/chamar?t=${t}&num=${num}`)).json();
+      updateCall(called, attendant);
+    };
+    btnReset.onclick = async () => {
+      if (!confirm('Confirma resetar todos os tickets para 1?')) return;
+      await fetch(`/.netlify/functions/reset?t=${t}`, { method: 'POST' });
+      updateCall(0, '');
+    };
+    renderQRCode(t);
+    fetchStatus(t);
+    fetchCancelled(t);
+    setInterval(() => fetchStatus(t), 5000);
+    setInterval(() => fetchCancelled(t), 5000);
+  }
+
+  /** Exibe a interface principal após autenticação */
+  function showApp(label, tId) {
+    onboardOverlay.hidden = true;
+    loginOverlay.hidden   = true;
+    headerEl.hidden       = false;
+    mainEl.hidden         = false;
+    bodyEl.classList.add('authenticated');
+    headerLabel.textContent = label;
+    initApp(tId);
+  }
+
   // ■■■ Fluxo de Autenticação / Trial ■■■
   (async () => {
     // 1) Se já temos cfg em localStorage, pular direto
-    if (cfg && cfg.empresa && cfg.senha) {
-      showApp(cfg.empresa, token || '');
+    if (cfg && cfg.empresa && cfg.senha && token) {
+      showApp(cfg.empresa, token);
       return;
     }
 
@@ -213,14 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
       onboardOverlay.hidden = true;
       try {
         const senhaPrompt = prompt(`Digite a senha de acesso para a empresa ${empresaParam}:`);
-        const res = await fetch('/.netlify/functions/getMonitorConfig', {
+        const res = await fetch(`${location.origin}/.netlify/functions/getMonitorConfig`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, senha: senhaPrompt })
         });
         if (!res.ok) throw new Error();
         const { empresa } = await res.json();
-        cfg = { empresa, senha: senhaPrompt };        
+        cfg = { token, empresa, senha: senhaPrompt };
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
         history.replaceState(null, '', `/monitor-attendant/?empresa=${encodeURIComponent(empresaParam)}`);
         showApp(empresa, token);
@@ -246,17 +251,18 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         token = crypto.randomUUID().split('-')[0];
         const trialDays = 7;
-        const res = await fetch('/.netlify/functions/saveMonitorConfig', {
+        const res = await fetch(`${location.origin}/.netlify/functions/saveMonitorConfig`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, empresa: label, senha: pw, trialDays })
         });
         const { ok } = await res.json();
         if (!ok) throw new Error();
-        cfg = { empresa: label, senha: pw };
+        cfg = { token, empresa: label, senha: pw };
         localStorage.setItem('monitorConfig', JSON.stringify(cfg));
         history.replaceState(
-          null, '',
+          null,
+          '',
           `/monitor-attendant/?t=${token}&empresa=${encodeURIComponent(label)}`
         );
         showApp(label, token);
