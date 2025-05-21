@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SuaVez Cliente</title>
+  <title>SuaVez</title>
   <link rel="stylesheet" href="css/client.css"/>
 </head>
 <body>
-  <!-- Overlay inicial para destravar áudio/vibração/notificações -->
+  <!-- Overlay para ativar notificações e som -->
   <div id="overlay">
     <button id="btn-start">Toque para ativar alertas</button>
   </div>
@@ -15,7 +15,7 @@
   <div class="client-wrapper hidden">
     <header class="client-header">
       <div class="logo">SuaVez</div>
-      <h1 id="client-company" class="company-name">Carregando...</h1>
+      <h2 id="client-company" class="company-name"></h2>
     </header>
 
     <main class="container">
@@ -37,6 +37,42 @@
     </main>
   </div>
 
-  <script src="js/client.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const overlay    = document.getElementById('overlay');
+      const wrapper    = document.querySelector('.client-wrapper');
+      const companyEl  = document.getElementById('client-company');
+      const urlParams  = new URL(location).searchParams;
+      const token      = urlParams.get('t');
+      const ticketEl   = document.getElementById('ticket');
+      const statusEl   = document.getElementById('status');
+      const alertSound = document.getElementById('alert-sound');
+      
+      // Ativar som e notificações
+      document.getElementById('btn-start').onclick = () => {
+        overlay.classList.add('hidden');
+        wrapper.classList.remove('hidden');
+      };
+
+      // Buscar empresa
+      try {
+        const res = await fetch('/.netlify/functions/getMonitorConfig', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ token, senha: '' })
+        });
+        const { empresa } = await res.json();
+        companyEl.textContent = empresa;
+      } catch {
+        companyEl.textContent = '';
+      }
+
+      // TODO: inicializar lógica de fila: polling, update ticket/status, tocar som, blink class
+      // Exemplo de chamada de demo:
+      // ticketEl.textContent = 'A01';
+      // statusEl.textContent = 'É sua vez!';
+      // alertSound.play();
+      // statusEl.classList.add('blink');
+    });
+  </script>
 </body>
 </html>
