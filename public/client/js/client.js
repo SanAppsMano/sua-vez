@@ -30,7 +30,7 @@ btnStart.addEventListener("click", () => {
 });
 
 async function getTicket() {
-  const res = await fetch(/.netlify/functions/entrar?t=${tenantId});
+  const res = await fetch(`/.netlify/functions/entrar?t=${tenantId}`);
   const data = await res.json();
   clientId     = data.clientId;
   ticketNumber = data.ticketNumber;
@@ -40,17 +40,17 @@ async function getTicket() {
 
 async function checkStatus() {
   if (!ticketNumber) return;
-  const res = await fetch(/.netlify/functions/status?t=${tenantId});
+  const res = await fetch(`/.netlify/functions/status?t=${tenantId}`);
   const { currentCall, timestamp, attendant } = await res.json();
 
   if (currentCall !== ticketNumber) {
-    statusEl.textContent = Chamando: ${currentCall} (${attendant});
+    statusEl.textContent = `Chamando: ${currentCall} (${attendant})`;
     btnCancel.disabled = false;
     statusEl.classList.remove("blink");
     return;
   }
 
-  statusEl.textContent = É a sua vez! (Atendente: ${attendant});
+  statusEl.textContent = `É a sua vez! (Atendente: ${attendant})`;
   statusEl.classList.add("blink");
   btnCancel.disabled = true;
 
@@ -87,7 +87,7 @@ btnCancel.addEventListener("click", async () => {
   statusEl.textContent = "Cancelando...";
   clearInterval(alertInterval);
 
-  await fetch(/.netlify/functions/cancelar?t=${tenantId}, {
+  await fetch(`/.netlify/functions/cancelar?t=${tenantId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId })
